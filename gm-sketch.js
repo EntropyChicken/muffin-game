@@ -532,7 +532,7 @@ function drawPayout() {
     }
   }
   const winnerKeeps = MAX_MUFFINS - totalDedicated;
-  text(`${winner} gets ${formatMuffins(winnerKeeps)} muffins`, x, y);
+  text(`${winner} gets ${formatMuffins(winnerKeeps)} muffins and the 'winner' title!`, x, y);
 }
 
 function drawDedicationLog() {
