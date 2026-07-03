@@ -73,7 +73,6 @@ function renderRegistrationUI(attemptedName) {
   loginInput.attribute("placeholder", "Your Name");
   loginInput.elt.focus();
 
-  // Save the button to a variable so we can manipulate/delete it later
   const joinButton = createButton("Request to Join");
   joinButton.class("dedicate-btn");
 
@@ -94,7 +93,6 @@ function renderRegistrationUI(attemptedName) {
         instructionText.html(`Request for "<b>${pendingNameApproval}</b>" was denied. Please try a different name.`);
         pendingNameApproval = null;
         
-        // ─── CHANGE: If denied, recreate or show the button/input controls again ───
         loginInput.removeAttribute("disabled");
         loginInput.style("display", "inline-block");
         joinButton.style("display", "inline-block");
@@ -114,9 +112,16 @@ function renderRegistrationUI(attemptedName) {
       return;
     }
 
+    // ─── FIX: Fast-track bypassing! If the name is already in the game, log them right in ───
+    const existingMatch = PLAYERS.find(p => p.toLowerCase() === enteredName.toLowerCase());
+    if (existingMatch) {
+      const newUrl = `${window.location.origin}${window.location.pathname}?player=${encodeURIComponent(existingMatch)}`;
+      window.location.href = newUrl;
+      return;
+    }
+
     pendingNameApproval = enteredName;
 
-    // ─── CHANGE: Hide input components completely from view so they can't spam ───
     loginInput.style("display", "none");
     joinButton.style("display", "none");
 
@@ -155,6 +160,12 @@ function connectToSupabase() {
   channel.on("broadcast", { event: "ROSTER_SYNC" }, (msg) => {
     if (msg.payload && msg.payload.currentPlayers) {
       PLAYERS = msg.payload.currentPlayers; 
+      
+      // ─── FIX: Instantly catch our presses if we are fully loaded in ───
+      if (playerName !== "Unknown" && msg.payload.pressesRemaining) {
+        pressesRemainingLocal = msg.payload.pressesRemaining[playerName];
+        if (pressesText) pressesText.html(pressesLabel());
+      }
     }
   });
 
@@ -165,11 +176,14 @@ function connectToSupabase() {
   channel.subscribe(async (status) => {
     channelReady = status === "SUBSCRIBED";
     if (status === "SUBSCRIBED") {
-      channel.send({
-        type: "broadcast",
-        event: "REQUEST_ROSTER",
-        payload: {}
-      });
+      setTimeout(() => {
+        channel.send({
+          type: "broadcast",
+          event: "REQUEST_ROSTER",
+          payload: {}
+        });
+      }, 500);
+      
       if (playerName !== "Unknown") {
         await channel.track({ player: playerName });
       }
@@ -309,7 +323,7 @@ function pressesLabel() {
     return `${pressesRemainingLocal} / ${MAX_PRESSES} presses left`;
   }
   else{
-    return "awaiting data update..."
+    return "awaiting data update...";
   }
 }
 

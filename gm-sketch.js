@@ -129,14 +129,21 @@ class FireworkParticle {
 
 
 async function setup() {
-  isAuthenticated = await checkGMPasswordHashed();
-  if (!isAuthenticated) {
-    return; // Break script execution completely if denied
-  }
+  // Connect to Supabase FIRST, before the password gate below.
+  // This is the actual GM device the moment the page loads, and
+  // players' JOIN/REQUEST_ROSTER messages need something listening
+  // right away — they shouldn't have to wait on a human typing a
+  // password. The password only needs to gate rendering/controls,
+  // not whether this browser is subscribed to the channel.
   createCanvas(windowWidth, windowHeight);
-  angleMode(DEGREES); 
+  angleMode(DEGREES);
   resetGameState();
   connectToSupabase();
+
+  isAuthenticated = await checkGMPasswordHashed();
+  if (!isAuthenticated) {
+    return; // Only blocks what's below (rendering/controls), not the connection above
+  }
 
   // Create the "Add Player" textbox in the bottom right
   addPlayerInput = createInput("");
@@ -245,12 +252,15 @@ function connectToSupabase() {
     handleNameRequest(msg.payload);
   });
 
-  // ─── NEW: Instantly hand over the roster when a new page asks for it ───
   channel.on("broadcast", { event: "REQUEST_ROSTER" }, () => {
     channel.send({
       type: "broadcast",
       event: "ROSTER_SYNC",
-      payload: { currentPlayers: PLAYERS }
+      // ─── FIX: Send the presses along with the roster ───
+      payload: { 
+        currentPlayers: PLAYERS,
+        pressesRemaining: pressesRemaining 
+      }
     });
   });
 
@@ -258,11 +268,13 @@ function connectToSupabase() {
     channelStatusText = status;
     
     if (status === "SUBSCRIBED") {
-      channel.send({
-        type: "broadcast",
-        event: "GAME_RESET",
-        payload: {}
-      });
+      setTimeout(() => {
+        channel.send({
+          type: "broadcast",
+          event: "GAME_RESET",
+          payload: {}
+        });
+      }, 500);
     }
   });
 }
@@ -271,10 +283,7 @@ function connectToSupabase() {
 
 function handleJoinMessage(payload) {
   const player = payload && payload.player;
-  
-  const playerExists = PLAYERS.some(
-    (p) => p.toLowerCase() === (player || "").toLowerCase()
-  );
+  const playerExists = PLAYERS.some((p) => p.toLowerCase() === (player || "").toLowerCase());
 
   if (!playerExists) {
     console.log(`Unrecognized player "${player}" tried to join.`);
@@ -284,16 +293,55 @@ function handleJoinMessage(payload) {
   channel.send({
     type: "broadcast",
     event: EVENTS.STATE_SYNC,
-    payload: {
-      player: player,
-      pressesRemaining: pressesRemaining[player]
-    }
+    payload: { player: player, pressesRemaining: pressesRemaining[player] }
   });
+  
+  // ─── FIX: Bundle presses ───
   channel.send({
     type: "broadcast",
     event: "ROSTER_SYNC",
-    payload: { currentPlayers: PLAYERS }
+    payload: { currentPlayers: PLAYERS, pressesRemaining: pressesRemaining }
   });
+}
+
+function registerNewPlayer() {
+  const newName = addPlayerInput.value().trim();
+  if (!newName) return;
+
+  const exists = PLAYERS.some(p => p.toLowerCase() === newName.toLowerCase());
+  if (exists) {
+    console.log(`Player "${newName}" is already in the game.`);
+    addPlayerInput.value(""); 
+    return;
+  }
+
+  PLAYERS.push(newName);
+  pressesRemaining[newName] = MAX_PRESSES;
+  dedicationMax[newName] = {};
+
+  for (const existingPlayer of PLAYERS) {
+    dedicationMax[existingPlayer][newName] = 0;
+    dedicationMax[newName][existingPlayer] = 0;
+  }
+
+  console.log(`Successfully added new player: ${newName}`);
+
+  if (channel) {
+    channel.send({
+      type: "broadcast",
+      event: EVENTS.APPROVE,
+      payload: { approvedName: newName }
+    });
+
+    // ─── FIX: Bundle presses ───
+    channel.send({
+      type: "broadcast",
+      event: "ROSTER_SYNC",
+      payload: { currentPlayers: PLAYERS, pressesRemaining: pressesRemaining }
+    });
+  }
+  
+  addPlayerInput.value("");
 }
 function handlePressMessage(payload) {
   const rawPlayer = payload && payload.player;
@@ -383,8 +431,16 @@ function handleNameRequest(payload) {
   const name = payload && payload.requestedName ? payload.requestedName.trim() : null;
   if (!name) return;
 
-  // Skip if they are already fully registered in the game
-  if (PLAYERS.some(p => p.toLowerCase() === name.toLowerCase())) return;
+  // ─── FIX: If they are already in the game, auto-approve them instantly ───
+  const existing = PLAYERS.find(p => p.toLowerCase() === name.toLowerCase());
+  if (existing) {
+    channel.send({
+      type: "broadcast",
+      event: EVENTS.APPROVE,
+      payload: { approvedName: existing }
+    });
+    return;
+  }
 
   // Skip if this exact name string is already sitting in the visible queue
   if (requestedNamesQueue.includes(name)) return;
@@ -392,13 +448,11 @@ function handleNameRequest(payload) {
   // Append to stream
   requestedNamesQueue.push(name);
 
-  // honestly just let it overflow...?
-  const maxVisibleRequests = 1000;//floor(width / 180);
+  const maxVisibleRequests = 1000;
   if (requestedNamesQueue.length > maxVisibleRequests) {
     requestedNamesQueue.shift();
   }
 
-  // Redraw the live console row
   renderRequestConsole();
 }
 
@@ -550,14 +604,30 @@ function drawPlayerList() {
     return;
   }
 
+  // 1. Find the maximum text width across all player names
+  let maxNameWidth = 0;
+  for (const p of PLAYERS) {
+    let w = textWidth(p);
+    if (w > maxNameWidth) {
+      maxNameWidth = w;
+    }
+  }
+
+  // 2. Render names and align statuses using the max width
+  const statusGap = 20; // Extra spacing gap between names and the dash
+  
   for (const p of PLAYERS) {
     const isRunner = p === currentRunner && gameStatus !== "finished";
     fill(isRunner ? getTimeColor() : color(200));
-    text(
-      `${p}  —  ${pressesRemaining[p]} press${pressesRemaining[p] === 1 ? "" : "es"} left`,
-      x,
-      y
-    );
+    
+    // Draw the name at the base X position
+    text(p, x, y);
+    
+    // Draw the aligned status offset past the widest name
+    const statusX = x + maxNameWidth + statusGap;
+    const statusTextString = "("+pressesRemaining[p]+" left)";
+    text(statusTextString, statusX, y);
+    
     y += 35;
   }
 }
@@ -728,47 +798,4 @@ function renderRequestConsole() {
     requestElements.push(btn);
     currentX += btn.elt.offsetWidth + 12; // Slide x coordinate right for next item
   }
-}
-
-function registerNewPlayer() {
-  const newName = addPlayerInput.value().trim();
-  if (!newName) return;
-
-  const exists = PLAYERS.some(p => p.toLowerCase() === newName.toLowerCase());
-  if (exists) {
-    console.log(`Player "${newName}" is already in the game.`);
-    addPlayerInput.value(""); 
-    return;
-  }
-
-  // 1. Update the GM's local memory lists
-  PLAYERS.push(newName);
-  pressesRemaining[newName] = MAX_PRESSES;
-  dedicationMax[newName] = {};
-
-  for (const existingPlayer of PLAYERS) {
-    dedicationMax[existingPlayer][newName] = 0;
-    dedicationMax[newName][existingPlayer] = 0;
-  }
-
-  console.log(`Successfully added new player: ${newName}`);
-
-  // 2. Broadcast the approval AND the updated roster immediately to the room!
-  if (channel) {
-    // Tell the specific player tab waiting for this name to reload/proceed
-    channel.send({
-      type: "broadcast",
-      event: EVENTS.APPROVE,
-      payload: { approvedName: newName }
-    });
-
-    // Send the updated global array so the newly reloaded tab recognizes the name
-    channel.send({
-      type: "broadcast",
-      event: "ROSTER_SYNC",
-      payload: { currentPlayers: PLAYERS }
-    });
-  }
-  
-  addPlayerInput.value("");
 }
