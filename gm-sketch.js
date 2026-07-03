@@ -146,19 +146,17 @@ function handleDedicateMessage(payload) {
     console.log(`Received bad dedication data from ${player}.`);
     return;
   }
-
   const recipient = PLAYERS.find(
     (p) => p.toLowerCase() === recipientRaw.toLowerCase()
   );
-
   if (!recipient) {
     console.log(`${player} tried to dedicate to an unrecognized player "${recipientRaw}".`);
     return;
   }
 
-  // --- NEW CAP LOGIC START ---
+  
 
-  // 1. Calculate how many muffins this player has currently dedicated to EVERYONE ELSE
+  // math for capping at 6
   let currentTotalToOthers = 0;
   for (const target of PLAYERS) {
     if (target !== recipient) {
@@ -166,37 +164,28 @@ function handleDedicateMessage(payload) {
     }
   }
 
-  // 2. See how much room they have left out of their 6-muffin total quota
   const allowedMaxForThisRecipient = 6.0 - currentTotalToOthers;
-
-  // If they have already completely spent their 6 muffins elsewhere, drop the request
   if (allowedMaxForThisRecipient <= 0) {
     console.log(`${player} has already hit their global 6-muffin limit.`);
     return;
   }
-
-  // 3. Apply the cap: if their request goes over what's left, forcefully squeeze it down to the cap
   let finalAmount = amount;
   if (finalAmount > allowedMaxForThisRecipient) {
     finalAmount = allowedMaxForThisRecipient;
     console.log(`${player}'s dedication to ${recipient} was capped at ${finalAmount} to respect the 6-muffin max.`);
   }
-
-  // 4. Enforce your existing "must exceed previous highest to this specific person" rule
   const previousMax = dedicationMax[player][recipient];
   if (finalAmount <= previousMax) {
     console.log(`${player} tried to dedicate ${finalAmount} (capped) to ${recipient}, which doesn't exceed previous max of ${previousMax}.`);
     return;
   }
 
-  // --- NEW CAP LOGIC END ---
+  
 
-  // Save the validated/capped amount
+
+
   dedicationMax[player][recipient] = finalAmount;
-
-  // Filter out any existing log item matching this specific from -> to pair
   dedicationLog = dedicationLog.filter(d => !(d.from === player && d.to === recipient));
-
   dedicationLog.push({
     time: Date.now(),
     from: player,
@@ -210,8 +199,7 @@ function handleDedicateMessage(payload) {
 function draw() {
   checkWinCondition();
 
-  background(18);
-
+  drawBackgroud();
   drawTimerAndRunner();
   drawPlayerList();
   if (gameStatus === "finished") {
@@ -241,17 +229,22 @@ function getRemainingSeconds() {
 function drawTimerAndRunner() {
   textFont("monospace");
   textAlign(CENTER, TOP);
-
-  fill(245);
+  
   textSize(111);
+  if (gameStatus === "finished" || currentRunner === null) {
+    fill(255);
+  } else {
+    fill(getTimeColor());
+  }
   text(formatOneDecimal(getRemainingSeconds()), width / 2, 30);
-
+  
+  fill(255);
   textSize(34);
   if (gameStatus === "finished") {
     fill(242, 182, 50);
     text(`WINNER: ${winner}`, width / 2, 150);
   } else if (currentRunner) {
-    fill(120, 220, 160);
+    fill(getTimeColor());
     text(`Runner: ${currentRunner}`, width / 2, 150);
   } else {
     fill(150);
@@ -267,6 +260,18 @@ function playerListEndY() {
   return playerListStartY() + 22 + PLAYERS.length * 35 + 35;
 }
 
+function drawBackgroud() {
+  if (gameStatus === "finished") {
+    background(30);
+  } 
+  else if (currentRunner === null) {
+    // Checks if currentRunner is strictly null
+    background(50);
+  } 
+  else {
+    background(0);
+  }
+}
 function drawPlayerList() {
   textFont("monospace");
   textAlign(LEFT, TOP);
@@ -281,7 +286,7 @@ function drawPlayerList() {
 
   for (const p of PLAYERS) {
     const isRunner = p === currentRunner && gameStatus !== "finished";
-    fill(isRunner ? color(120, 220, 160) : color(200));
+    fill(isRunner ? getTimeColor() : color(200));
     text(
       `${p}  —  ${pressesRemaining[p]} press${pressesRemaining[p] === 1 ? "" : "es"} left`,
       x,
@@ -382,4 +387,14 @@ function drawConnectionStatus() {
   textSize(11);
   fill(90);
   text(`realtime: ${channelStatusText}`, width - 10, height - 10);
+}
+
+function getTimeColor() {
+  let totalTime = RUN_DURATION_SECONDS * 1000;
+  let timeLeft = max(0, timerEndTime - Date.now());
+  let progress = timeLeft / totalTime;
+  colorMode(HSB, 360, 100, 100);
+  let timeColor = color((max(progress * 270-30,-10)+360)%360,64,100);
+  colorMode(RGB, 255);
+  return timeColor;
 }
