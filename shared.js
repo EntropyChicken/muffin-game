@@ -26,14 +26,17 @@ const MAX_MUFFINS = 6;
 // The players in this game. Edit this list for your session
 // (names here must exactly match, ignoring case, what you hand
 // out as ?player=NAME links, and what people type in dedications).
-const PLAYERS = ["Alice", "Bob", "Charlie"];
+let PLAYERS = []; //["Alice", "Bob", "Charlie"];
 
 // ---- 3) MESSAGE TYPES -------------------------------------------------------
 const EVENTS = {
   PRESS: "press",
   DEDICATE: "dedicate",
-  JOIN: "join",              // NEW: player -> GM, "what's my real state?"
-  STATE_SYNC: "state_sync"   // NEW: GM -> that player, the answer
+  JOIN: "join",        
+  STATE_SYNC: "state_sync",
+  REQUEST_NAME: "request_name",
+  APPROVE: "approve",
+  DENY: "deny"
 };
 
 // ---- 4) DEDICATION TEXT FORMAT ----------------------------------------------
@@ -57,9 +60,13 @@ function parseDedicationText(text) {
 }
 
 // ---- 5) FORMATTING HELPERS ---------------------------------------------------
-// Always show exactly one decimal place, e.g. 20 -> "20.0", 5.34 -> "5.3"
-function formatOneDecimal(n) {
-  return Number(n).toFixed(1);
+function formatTimer(n) {
+  if(n<20){
+    return Number(n).toFixed(1);
+  }
+    else{
+      return floor(n);
+  }
 }
 
 function formatMuffins(n) {

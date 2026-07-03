@@ -14,6 +14,10 @@
 const gameMasterPasswordHash = "fc63a788b7769bc10b6c3621375e5fb883bb7e0dd2d4949d65a990d912d6fd81";
 let isAuthenticated = false;
 
+let addPlayerInput;
+let requestedNamesQueue = []; // Holds strings of incoming requests
+let requestElements = [];     // Holds the DOM buttons we render
+
 let gameStatus;       // "waiting" | "running" | "finished"
 let pressesRemaining; // { playerName: number }
 let currentRunner;    // playerName | null
@@ -133,6 +137,29 @@ async function setup() {
   angleMode(DEGREES); 
   resetGameState();
   connectToSupabase();
+
+  // Create the "Add Player" textbox in the bottom right
+  addPlayerInput = createInput("");
+  addPlayerInput.attribute("placeholder", "Add player name...");
+  addPlayerInput.style("position", "fixed");
+  addPlayerInput.style("bottom", "20px");
+  addPlayerInput.style("right", "20px");
+  addPlayerInput.style("padding", "8px 12px");
+  addPlayerInput.style("font-family", "monospace");
+  addPlayerInput.style("font-size", "16px");
+  addPlayerInput.style("background", "#333");
+  addPlayerInput.style("color", "#fff");
+  addPlayerInput.style("border", "1px solid #555");
+  addPlayerInput.style("border-radius", "4px");
+  addPlayerInput.style("z-index", "10000"); // Make sure it sits on top of the canvas
+
+  // Listen for the Enter key to register the new player
+  addPlayerInput.elt.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      registerNewPlayer();
+    }
+  });
 }
 
 async function checkGMPasswordHashed() {
@@ -205,17 +232,26 @@ function resetGameState() {
 
 function connectToSupabase() {
   channel = supabaseClient.channel(CHANNEL_NAME);
-
   channel.on("broadcast", { event: EVENTS.JOIN }, (msg) => {
     handleJoinMessage(msg.payload);
   });
-
   channel.on("broadcast", { event: EVENTS.PRESS }, (msg) => {
     handlePressMessage(msg.payload);
   });
-
   channel.on("broadcast", { event: EVENTS.DEDICATE }, (msg) => {
     handleDedicateMessage(msg.payload);
+  });
+  channel.on("broadcast", { event: EVENTS.REQUEST_NAME }, (msg) => {
+    handleNameRequest(msg.payload);
+  });
+
+  // ─── NEW: Instantly hand over the roster when a new page asks for it ───
+  channel.on("broadcast", { event: "REQUEST_ROSTER" }, () => {
+    channel.send({
+      type: "broadcast",
+      event: "ROSTER_SYNC",
+      payload: { currentPlayers: PLAYERS }
+    });
   });
 
   channel.subscribe((status) => {
@@ -253,8 +289,12 @@ function handleJoinMessage(payload) {
       pressesRemaining: pressesRemaining[player]
     }
   });
+  channel.send({
+    type: "broadcast",
+    event: "ROSTER_SYNC",
+    payload: { currentPlayers: PLAYERS }
+  });
 }
-
 function handlePressMessage(payload) {
   const rawPlayer = payload && payload.player;
 
@@ -282,7 +322,6 @@ function handlePressMessage(payload) {
   gameStatus = "running";
   timerEndTime = Date.now() + RUN_DURATION_SECONDS * 1000;
 }
-
 function handleDedicateMessage(payload) {
   const player = payload && payload.player;
   const amount = payload && payload.amount;
@@ -339,6 +378,28 @@ function handleDedicateMessage(payload) {
     to: recipient,
     amount: finalAmount
   });
+}
+function handleNameRequest(payload) {
+  const name = payload && payload.requestedName ? payload.requestedName.trim() : null;
+  if (!name) return;
+
+  // Skip if they are already fully registered in the game
+  if (PLAYERS.some(p => p.toLowerCase() === name.toLowerCase())) return;
+
+  // Skip if this exact name string is already sitting in the visible queue
+  if (requestedNamesQueue.includes(name)) return;
+
+  // Append to stream
+  requestedNamesQueue.push(name);
+
+  // honestly just let it overflow...?
+  const maxVisibleRequests = 1000;//floor(width / 180);
+  if (requestedNamesQueue.length > maxVisibleRequests) {
+    requestedNamesQueue.shift();
+  }
+
+  // Redraw the live console row
+  renderRequestConsole();
 }
 
 // ---- Rendering ----------------------------------------------------------------
@@ -447,7 +508,7 @@ function drawTimerAndRunner() {
   } else {
     fill(getTimeColor());
   }
-  text(formatOneDecimal(getRemainingSeconds()), width / 2, 30);
+  text(formatTimer(getRemainingSeconds()), width / 2, 30);
   
   fill(255);
   textSize(34);
@@ -480,8 +541,14 @@ function drawPlayerList() {
   let y = playerListStartY();
 
   fill(200);
-  text("PLAYERS", x, y);
+  text("PLAYERS:", x, y);
   y += 35;
+  
+  if (PLAYERS.length === 0) {
+    fill(120);
+    text("(none yet)", x, y);
+    return;
+  }
 
   for (const p of PLAYERS) {
     const isRunner = p === currentRunner && gameStatus !== "finished";
@@ -532,7 +599,7 @@ function drawPayout() {
     }
   }
   const winnerKeeps = MAX_MUFFINS - totalDedicated;
-  text(`${winner} gets ${formatMuffins(winnerKeeps)} muffins and the 'winner' title!`, x, y);
+  text(`${winner} gets ${formatMuffins(winnerKeeps)} muffins and is the WINNER`, x, y);
 }
 
 function drawDedicationLog() {
@@ -544,7 +611,7 @@ function drawDedicationLog() {
   let y = playerListStartY(); 
 
   fill(200);
-  text("DEDICATIONS", x, y);
+  text("DEDICATIONS:", x, y);
   y += 35;
 
   if (dedicationLog.length === 0) {
@@ -594,4 +661,114 @@ function getTimeColor() {
   let timeColor = color((max(progress * 250 - 10, 0) + 360) % 360, 72, 100);
   colorMode(RGB, 255);
   return timeColor;
+}
+
+function renderRequestConsole() {
+  // Clear previous DOM instances of the list
+  for (let el of requestElements) {
+    el.remove();
+  }
+  requestElements = [];
+
+  // Anchor placement configurations at the bottom left
+  let currentX = 20;
+  const currentY = height - 70;
+
+  if (requestedNamesQueue.length > 0) {
+    let title = createSpan("Pending Approval (right click to delete):");
+    title.position(currentX, currentY - 25);
+    title.style("font-family", "monospace");
+    title.style("color", "#ffb600");
+    title.style("font-size", "14px");
+    requestElements.push(title);
+  }
+
+  // Map individual entries into interactive buttons
+  for (let i = 0; i < requestedNamesQueue.length; i++) {
+    const candidateName = requestedNamesQueue[i];
+
+    let btn = createButton(`＋ ${candidateName}`);
+    btn.position(currentX, currentY);
+    btn.style("padding", "6px 10px");
+    btn.style("font-family", "monospace");
+    btn.style("background", "#2a4d2a");
+    btn.style("color", "#fff");
+    btn.style("border", "1px solid #44aa44");
+    btn.style("border-radius", "4px");
+    btn.style("cursor", "pointer");
+
+    // 1. LEFT-CLICK: Approve and register the player
+    btn.mousePressed((event) => {
+      // Check if it's a standard left-click (button 0)
+      if (event.button === 0) {
+        addPlayerInput.value(candidateName);
+        registerNewPlayer();
+
+        // Remove from queue layout tracking
+        requestedNamesQueue.splice(i, 1);
+        renderRequestConsole();
+      }
+    });
+
+    btn.elt.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      
+      if (channel) {
+        channel.send({
+          type: "broadcast",
+          event: EVENTS.DENY,
+          payload: { deniedName: candidateName }
+        });
+      }
+
+      requestedNamesQueue.splice(i, 1);
+      renderRequestConsole();
+    });
+
+    requestElements.push(btn);
+    currentX += btn.elt.offsetWidth + 12; // Slide x coordinate right for next item
+  }
+}
+
+function registerNewPlayer() {
+  const newName = addPlayerInput.value().trim();
+  if (!newName) return;
+
+  const exists = PLAYERS.some(p => p.toLowerCase() === newName.toLowerCase());
+  if (exists) {
+    console.log(`Player "${newName}" is already in the game.`);
+    addPlayerInput.value(""); 
+    return;
+  }
+
+  // 1. Update the GM's local memory lists
+  PLAYERS.push(newName);
+  pressesRemaining[newName] = MAX_PRESSES;
+  dedicationMax[newName] = {};
+
+  for (const existingPlayer of PLAYERS) {
+    dedicationMax[existingPlayer][newName] = 0;
+    dedicationMax[newName][existingPlayer] = 0;
+  }
+
+  console.log(`Successfully added new player: ${newName}`);
+
+  // 2. Broadcast the approval AND the updated roster immediately to the room!
+  if (channel) {
+    // Tell the specific player tab waiting for this name to reload/proceed
+    channel.send({
+      type: "broadcast",
+      event: EVENTS.APPROVE,
+      payload: { approvedName: newName }
+    });
+
+    // Send the updated global array so the newly reloaded tab recognizes the name
+    channel.send({
+      type: "broadcast",
+      event: "ROSTER_SYNC",
+      payload: { currentPlayers: PLAYERS }
+    });
+  }
+  
+  addPlayerInput.value("");
 }
