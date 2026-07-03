@@ -1,6 +1,6 @@
 # Muffin Game
 
-An original game designed to explore game theory concepts—and how they fall apart under real-world human behavior. 
+An original game I came up with in order to write a story about game theory concepts falling apart under real-world behavior.
 
 ## The Rules
 * **The Goal:** Be the "runner" for 100 uninterrupted seconds to win.
@@ -10,7 +10,7 @@ An original game designed to explore game theory concepts—and how they fall ap
 
 ## Technical Architecture
 
-Built as static frontend pages communicating via **Supabase Realtime (Broadcast)**. No database tables are used; all state lives in the Game Master's browser memory.
+Built as static frontend pages communicating via Supabase Realtime (Broadcast). No database tables are used; all state lives in the Game Master's browser memory.
 
 * **`gm.html` (Game Master Center):** The single source of truth. Manages the active timer, tracks press counts, calculates payouts, and dynamically renders the latest incoming dedications in a dedicated sidebar column. Reloading this page resets the entire game.
 * **`index.html` (Player Hub & Client):** Differentiated by passing the player's name as a query parameter (`index.html?player=Name`). Contains the action buttons and the dedication entry field.
