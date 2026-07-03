@@ -30,7 +30,9 @@ const PLAYERS = ["Alice", "Bob", "Charlie"];
 // ---- 3) MESSAGE TYPES -------------------------------------------------------
 const EVENTS = {
   PRESS: "press",
-  DEDICATE: "dedicate"
+  DEDICATE: "dedicate",
+  JOIN: "join",              // NEW: player -> GM, "what's my real state?"
+  STATE_SYNC: "state_sync"   // NEW: GM -> that player, the answer
 };
 
 // ---- 4) DEDICATION TEXT FORMAT ----------------------------------------------

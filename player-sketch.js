@@ -90,10 +90,67 @@ function autoGrowInput(inputElem) {
 
 function connectToSupabase() {
   channel = supabaseClient.channel(CHANNEL_NAME);
-  channel.subscribe((status) => {
+
+  // GM's reply to our join request
+  channel.on("broadcast", { event: EVENTS.STATE_SYNC }, (msg) => {
+    if (msg.payload.player === playerName) {
+      pressesRemainingLocal = msg.payload.pressesRemaining;
+      pressesText.html(pressesLabel());
+    }
+  });
+
+  // Fires whenever presence info changes for anyone in the channel
+  channel.on("presence", { event: "sync" }, () => {
+    checkForDuplicateName();
+  });
+
+  channel.on("broadcast", { event: EVENTS.JOIN }, (msg) => {
+    handleJoinMessage(msg.payload);
+  });
+
+  channel.subscribe(async (status) => {
     channelReady = status === "SUBSCRIBED";
+    if (status === "SUBSCRIBED") {
+      // Ask the GM what our real state is
+      channel.send({
+        type: "broadcast",
+        event: EVENTS.JOIN,
+        payload: { player: playerName }
+      });
+      // Announce our presence under our player name
+      await channel.track({ player: playerName });
+    }
   });
 }
+function checkForDuplicateName() {
+  const state = channel.presenceState();
+  let count = 0;
+  for (const key in state) {
+    for (const entry of state[key]) {
+      if (entry.player === playerName) count++;
+    }
+  }
+  if (count > 1) {
+    statusText.html(`Warning: it looks like ${playerName} is connected on more than one device.`);
+  }
+}
+function handleJoinMessage(payload) {
+  const player = payload && payload.player;
+  if (!PLAYERS.includes(player)) {
+    console.log(`Unrecognized player "${player}" tried to join.`);
+    return;
+  }
+  channel.send({
+    type: "broadcast",
+    event: EVENTS.STATE_SYNC,
+    payload: {
+      player: player,
+      pressesRemaining: pressesRemaining[player]
+    }
+  });
+}
+
+
 
 function pressesLabel() {
   return `Presses remaining: ${pressesRemainingLocal} / ${MAX_PRESSES}`;
