@@ -32,8 +32,8 @@ function setup() {
 
   const pressButton = createButton("Become the Runner");
   pressButton.mousePressed(handlePress);
-  pressButton.style("font-size", "20px");
-  pressButton.style("padding", "12px 24px");
+  pressButton.class("press-btn");
+
 
   createElement("hr");
 
@@ -42,24 +42,24 @@ function setup() {
   measureSpan = createSpan("");
   measureSpan.class("measure-span");
 
-  const line = createDiv();
-  line.class("dedication-line");
+  const dedicationLine = createDiv();
+  dedicationLine.class("dedication-line");
 
-  createSpan("I officially dedicate").parent(line);
+  createSpan("I officially dedicate").parent(dedicationLine);
 
   amountInput = createInput("");
   amountInput.class("auto-grow-input");
   amountInput.attribute("placeholder", "0.0");
   amountInput.attribute("inputmode", "decimal");
-  amountInput.parent(line);
+  amountInput.parent(dedicationLine);
   amountInput.input(() => autoGrowInput(amountInput));
 
-  createSpan("muffins to").parent(line);
+  createSpan("muffins to").parent(dedicationLine);
 
   nameInput = createInput("");
   nameInput.class("auto-grow-input");
   nameInput.attribute("placeholder", "name");
-  nameInput.parent(line);
+  nameInput.parent(dedicationLine);
   nameInput.input(() => autoGrowInput(nameInput));
 
   amountInput.elt.addEventListener("keydown", handleInputKey);
@@ -68,11 +68,12 @@ function setup() {
   autoGrowInput(amountInput);
   autoGrowInput(nameInput);
 
-  const dedicateButton = createButton("Send Dedication");
+  const dedicateButton = createButton("Make Dedication");
   dedicateButton.mousePressed(handleDedicate);
+  dedicateButton.class("dedicate-btn");
 
   statusText = createP("");
-  statusText.style("color", "#666");  
+  statusText.style("color", "#667");  
 
   connectToSupabase();
 }
@@ -137,7 +138,7 @@ function checkForDuplicateName() {
     }
   }
   if (count > 1) {
-    statusText.html(`Warning: it looks like ${playerName} is connected on more than one device.`);
+    statusText.html(`Warning: it looks like ${playerName} is connected multiple times `);
   }
 }
 function handleJoinMessage(payload) {
@@ -163,7 +164,7 @@ function pressesLabel() {
     return `${pressesRemainingLocal} / ${MAX_PRESSES} presses left`;
   }
   else{
-    return "...getting data..."
+    return "awaiting data update..."
   }
 }
 

@@ -31,6 +31,9 @@ body.player-page {
 }
 
 body.player-page h1 {
+  font-size: 36px;      /* Explicitly locks down the exact size */
+  font-weight: 700;     /* Makes it a strong, clean bold headline */
+  margin-top: 10px;
   margin-bottom: 0.2em;
 }
 
@@ -100,4 +103,38 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
+}
+
+.dedicate-btn {
+  display: block;          /* Puts it on its own line below the inputs */
+  width: 100%;             /* Makes it stretch across the whole container */
+  font-size: 18px;         /* Makes the text nice and big */
+  padding: 12px 24px;      /* Adds thick, comfortable spacing inside the button */
+  background: var(--accent); /* Uses your beautiful gold/yellow accent color */
+  color: #1a1a1a;          /* Dark text color so it contrast perfectly */
+  border: none;            /* Removes the ugly default browser border */
+  border-radius: 8px;      /* Smooth, rounded corners matching your layout */
+  cursor: pointer;         /* Makes the mouse turn into a hand pointer */
+  font-weight: 600;        /* Makes the text slightly bold */
+  margin: 15px auto 0 auto; /* Centers it and adds some breathing room on top */
+}
+.dedicate-btn:hover {
+  filter: brightness(1.1);
+}
+
+.press-btn {
+  display: block;          /* Puts it on its own line below the inputs */
+  width: 100%;             /* Makes it stretch across the whole container */
+  font-size: 36px;
+  padding: 12px 24px;
+  background: var(--accent); /* Uses your beautiful gold/yellow accent color */
+  color: #1a1a1a;          /* Dark text color so it contrast perfectly */
+  border: none;            /* Removes the ugly default browser border */
+  border-radius: 8px;      /* Smooth, rounded corners matching your layout */
+  cursor: pointer;         /* Makes the mouse turn into a hand pointer */
+  font-weight: 600;        /* Makes the text slightly bold */
+  margin: 15px auto 0 auto; /* Centers it and adds some breathing room on top */
+}
+.press-btn:hover {
+  filter: brightness(1.1);
 }
