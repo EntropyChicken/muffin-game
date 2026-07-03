@@ -51,6 +51,11 @@ function resetGameState() {
 function connectToSupabase() {
   channel = supabaseClient.channel(CHANNEL_NAME);
 
+  // 1. ADD THIS LISTENER SO THE GM ACTUALLY HEARS THE PLAYER JOIN
+  channel.on("broadcast", { event: EVENTS.JOIN }, (msg) => {
+    handleJoinMessage(msg.payload);
+  });
+
   channel.on("broadcast", { event: EVENTS.PRESS }, (msg) => {
     handlePressMessage(msg.payload);
   });
@@ -61,11 +66,32 @@ function connectToSupabase() {
 
   channel.subscribe((status) => {
     channelStatusText = status;
+    
+    // Auto-reset hook from earlier
+    if (status === "SUBSCRIBED") {
+      channel.send({
+        type: "broadcast",
+        event: "GAME_RESET",
+        payload: {}
+      });
+    }
   });
 }
 
 // ---- Message handlers -------------------------------------------------------
 
+function handleJoinMessage(payload) {
+  const player = payload && payload.player;
+  /* ... */
+  channel.send({
+    type: "broadcast",
+    event: EVENTS.STATE_SYNC,
+    payload: {
+      player: player,
+      pressesRemaining: pressesRemaining[player] // <--- CRITICAL ERROR
+    }
+  });
+}
 function handlePressMessage(payload) {
   const player = payload && payload.player;
 
@@ -266,8 +292,13 @@ function drawDedicationLog() {
   textAlign(LEFT, TOP);
   textSize(28);
 
-  const x = 30;
-  let y = payoutEndY();
+  // --- THE TWIST: MOVE TO THE RIGHT SIDE ---
+  // Place it exactly in the middle of the screen width-wise
+  const x = width / 2; 
+  
+  // Decouple it entirely from payoutEndY()! 
+  // It now starts at the exact same fixed height as the player list.
+  let y = playerListStartY(); 
 
   fill(200);
   text("DEDICATIONS", x, y);
@@ -279,10 +310,32 @@ function drawDedicationLog() {
     return;
   }
 
+  // --- ADJUSTED SCREEN CLIPPING PROTECTION ---
+  // Now it calculates space directly from the top starting position down to the bottom
+  const availableHeight = height - 40 - y;
+  const maxLinesPossible = floor(availableHeight / 35);
+
+  let itemsToRender = dedicationLog;
+  let showEllipsis = false;
+
+  if (dedicationLog.length > maxLinesPossible) {
+    showEllipsis = true;
+    const allowedDedicationsCount = maxLinesPossible - 1;
+    itemsToRender = dedicationLog.slice(dedicationLog.length - allowedDedicationsCount);
+  }
+
+  // Draw the ellipsis if old data was clipped out
+  if (showEllipsis) {
+    fill(120);
+    text("...", x, y);
+    y += 35;
+  }
+
+  // Draw the remaining dedications row by row on the right side
   fill(200);
-  for (const d of dedicationLog) {
+  for (const d of itemsToRender) {
     const timeStr = new Date(d.time).toLocaleTimeString();
-    text(`[${timeStr}] ${d.from} dedicated ${formatMuffins(d.amount)} muffins to ${d.to}`, x, y);
+    text(`[${timeStr}] ${d.from} to ${d.to}: ${formatMuffins(d.amount)}`, x, y);
     y += 35;
   }
 }

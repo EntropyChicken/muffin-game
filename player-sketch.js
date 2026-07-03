@@ -10,7 +10,7 @@
    ========================================================= */
 
 let playerName = "Unknown";
-let pressesRemainingLocal = MAX_PRESSES;
+let pressesRemainingLocal = -Infinity;//MAX_PRESSES;
 
 let channel;
 let channelReady = false;
@@ -37,10 +37,8 @@ function setup() {
 
   createElement("hr");
 
-  createP("Fill in your dedication:");
+  // createP("Fill in your dedication:");
 
-  // Hidden element used purely to measure how wide the typed text is,
-  // so the visible input can grow to match it (capped by CSS max-width).
   measureSpan = createSpan("");
   measureSpan.class("measure-span");
 
@@ -64,6 +62,9 @@ function setup() {
   nameInput.parent(line);
   nameInput.input(() => autoGrowInput(nameInput));
 
+  amountInput.elt.addEventListener("keydown", handleInputKey);
+  nameInput.elt.addEventListener("keydown", handleInputKey);
+
   autoGrowInput(amountInput);
   autoGrowInput(nameInput);
 
@@ -71,7 +72,7 @@ function setup() {
   dedicateButton.mousePressed(handleDedicate);
 
   statusText = createP("");
-  statusText.style("color", "#666");
+  statusText.style("color", "#666");  
 
   connectToSupabase();
 }
@@ -90,6 +91,11 @@ function autoGrowInput(inputElem) {
 
 function connectToSupabase() {
   channel = supabaseClient.channel(CHANNEL_NAME);
+  
+  channel.on("broadcast", { event: "GAME_RESET" }, () => {
+    console.log("Game Master reset the game! Reloading page...");
+    window.location.reload(); 
+  });
 
   // GM's reply to our join request
   channel.on("broadcast", { event: EVENTS.STATE_SYNC }, (msg) => {
@@ -153,7 +159,12 @@ function handleJoinMessage(payload) {
 
 
 function pressesLabel() {
-  return `Presses remaining: ${pressesRemainingLocal} / ${MAX_PRESSES}`;
+  if (Number.isFinite(pressesRemainingLocal)){
+    return `Presses remaining: ${pressesRemainingLocal} / ${MAX_PRESSES}`;
+  }
+  else{
+    return "Presses remaining: ?"
+  }
 }
 
 function handlePress() {
@@ -203,8 +214,16 @@ function handleDedicate() {
   });
 
   statusText.html(`Sent: "${text}"`);
-  amountInput.value("");
-  nameInput.value("");
+  // amountInput.value(""); // probably don't want to reset, tbh
+  // nameInput.value("");
   autoGrowInput(amountInput);
   autoGrowInput(nameInput);
+}
+
+// press enter to submit dedication request
+function handleInputKey(event) {
+  if (event.key === "Enter") {
+    event.preventDefault(); // Prevents accidental page reloads or form flashes
+    handleDedicate();
+  }
 }

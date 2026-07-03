@@ -44,7 +44,7 @@ body.player-page button {
   margin: 6px 0;
 }
 
-body.player-page input {
+body.player-page input:not(.auto-grow-input) {
   font-size: 16px;
   padding: 8px;
   width: 100%;
@@ -63,15 +63,13 @@ body.player-page input {
   margin: 10px 0;
 }
 
-/* Inputs grow to fit typed content (via JS), but never past this,
-   so long input can't push the page wider than the phone screen. */
 .auto-grow-input {
-  width: auto !important;
+  width: auto; /* Look mom, no !important! */
   min-width: 3ch;
   max-width: calc(100vw - 40px);
-  display: inline-block !important;
-  margin: 0 !important;
-  padding: 2px 6px !important;
+  display: inline-block;
+  margin: 0;
+  padding: 2px 6px;
   border: none;
   border-bottom: 2px solid var(--accent);
   background: transparent;
