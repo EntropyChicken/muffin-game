@@ -116,42 +116,42 @@ function handlePressMessage(payload) {
 
 function handleDedicateMessage(payload) {
   const player = payload && payload.player;
-  const text = payload && payload.text;
+  const amount = payload && payload.amount;
+  const recipientRaw = payload && payload.recipient;
 
   if (gameStatus === "finished") {
-    console.log(`${player} sent a dedication after the game had already finished: "${text}"`);
+    console.log(`${player} sent a dedication after the game had finished.`);
     return;
   }
   if (!PLAYERS.includes(player)) {
-    console.log(`Received a dedication from unrecognized player "${player}": "${text}"`);
+    console.log(`Received a dedication from unrecognized player "${player}".`);
+    return;
+  }
+  if (!recipientRaw || isNaN(amount)) {
+    console.log(`Received bad dedication data from ${player}.`);
     return;
   }
 
-  const parsed = parseDedicationText(text);
-  if (!parsed) {
-    console.log(`Could not parse dedication text from ${player}: "${text}"`);
-    return;
-  }
-
-  const { amount, recipientRaw } = parsed;
+  // Find the match in your authorized players array
   const recipient = PLAYERS.find(
     (p) => p.toLowerCase() === recipientRaw.toLowerCase()
   );
 
   if (!recipient) {
-    console.log(`${player} tried to dedicate to an unrecognized player "${recipientRaw}": "${text}"`);
+    console.log(`${player} tried to dedicate to an unrecognized player "${recipientRaw}".`);
     return;
   }
   if (!(amount > 0) || amount > MAX_MUFFINS) {
-    console.log(`${player} sent an out-of-range dedication amount (${amount}): "${text}"`);
+    console.log(`${player} sent an out-of-range dedication amount (${amount}).`);
     return;
   }
   const previousMax = dedicationMax[player][recipient];
   if (amount <= previousMax) {
-    console.log(`${player} tried to dedicate ${amount} to ${recipient}, which does not exceed their previous dedication of ${previousMax}: "${text}"`);
+    console.log(`${player} tried to dedicate ${amount} to ${recipient}, which doesn't exceed previous max.`);
     return;
   }
 
+  // Code behaves exactly the same once validated!
   dedicationMax[player][recipient] = amount;
   dedicationLog.push({
     time: Date.now(),

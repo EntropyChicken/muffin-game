@@ -111,10 +111,6 @@ function connectToSupabase() {
     checkForDuplicateName();
   });
 
-  channel.on("broadcast", { event: EVENTS.JOIN }, (msg) => {
-    handleJoinMessage(msg.payload);
-  });
-
   channel.subscribe(async (status) => {
     channelReady = status === "SUBSCRIBED";
     if (status === "SUBSCRIBED") {
@@ -141,21 +137,7 @@ function checkForDuplicateName() {
     statusText.html(`Warning: it looks like ${playerName} is connected multiple times `);
   }
 }
-function handleJoinMessage(payload) {
-  const player = payload && payload.player;
-  if (!PLAYERS.includes(player)) {
-    console.log(`Unrecognized player "${player}" tried to join.`);
-    return;
-  }
-  channel.send({
-    type: "broadcast",
-    event: EVENTS.STATE_SYNC,
-    payload: {
-      player: player,
-      pressesRemaining: pressesRemaining[player]
-    }
-  });
-}
+
 
 
 
@@ -196,27 +178,26 @@ function handleDedicate() {
     return;
   }
 
-  const amount = amountInput.value().trim();
+  const amount = parseFloat(amountInput.value().trim());
   const name = nameInput.value().trim();
 
-  if (!amount || !name) {
-    statusText.html("Fill in both an amount and a name first.");
+  if (isNaN(amount) || !name) {
+    statusText.html("Fill in a valid amount and a name first.");
     return;
   }
 
-  // Reassemble into the same sentence format the Game Master expects,
-  // e.g. "I officially dedicate 5.3 muffins to Charlie"
-  const text = `I officially dedicate ${amount} muffins to ${name}`;
-
+  // OPTIMIZED: Send raw data instead of a long sentence string
   channel.send({
     type: "broadcast",
     event: EVENTS.DEDICATE,
-    payload: { player: playerName, text: text }
+    payload: { 
+      player: playerName, 
+      amount: amount, 
+      recipient: name 
+    }
   });
 
-  statusText.html(`Sent: "${text}"`);
-  // amountInput.value(""); // probably don't want to reset, tbh
-  // nameInput.value("");
+  statusText.html(`Sent: Dedicated ${amount} muffins to ${name}`);
   autoGrowInput(amountInput);
   autoGrowInput(nameInput);
 }
