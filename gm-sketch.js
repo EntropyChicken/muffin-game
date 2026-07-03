@@ -294,12 +294,7 @@ function drawDedicationLog() {
   textAlign(LEFT, TOP);
   textSize(28);
 
-  // --- THE TWIST: MOVE TO THE RIGHT SIDE ---
-  // Place it exactly in the middle of the screen width-wise
   const x = width / 2; 
-  
-  // Decouple it entirely from payoutEndY()! 
-  // It now starts at the exact same fixed height as the player list.
   let y = playerListStartY(); 
 
   fill(200);
@@ -312,8 +307,6 @@ function drawDedicationLog() {
     return;
   }
 
-  // --- ADJUSTED SCREEN CLIPPING PROTECTION ---
-  // Now it calculates space directly from the top starting position down to the bottom
   const availableHeight = height - 40 - y;
   const maxLinesPossible = floor(availableHeight / 35);
 
@@ -326,18 +319,17 @@ function drawDedicationLog() {
     itemsToRender = dedicationLog.slice(dedicationLog.length - allowedDedicationsCount);
   }
 
-  // Draw the ellipsis if old data was clipped out
   if (showEllipsis) {
     fill(120);
     text("...", x, y);
     y += 35;
   }
 
-  // Draw the remaining dedications row by row on the right side
+  // Draw the remaining dedications row by row without timestamps
   fill(200);
   for (const d of itemsToRender) {
-    const timeStr = new Date(d.time).toLocaleTimeString();
-    text(`[${timeStr}] ${d.from} to ${d.to}: ${formatMuffins(d.amount)}`, x, y);
+    // UPDATED: No timestamp generation, cleaner layout output
+    text(`${d.from} to ${d.to}: ${formatMuffins(d.amount)}`, x, y);
     y += 35;
   }
 }
