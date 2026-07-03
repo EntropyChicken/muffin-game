@@ -82,27 +82,42 @@ function connectToSupabase() {
 
 function handleJoinMessage(payload) {
   const player = payload && payload.player;
-  /* ... */
+  
+  const playerExists = PLAYERS.some(
+    (p) => p.toLowerCase() === (player || "").toLowerCase()
+  );
+
+  if (!playerExists) {
+    console.log(`Unrecognized player "${player}" tried to join.`);
+    return;
+  }
+
   channel.send({
     type: "broadcast",
     event: EVENTS.STATE_SYNC,
     payload: {
       player: player,
-      pressesRemaining: pressesRemaining[player] // <--- CRITICAL ERROR
+      pressesRemaining: pressesRemaining[player]
     }
   });
 }
 function handlePressMessage(payload) {
-  const player = payload && payload.player;
+  const rawPlayer = payload && payload.player;
 
   if (gameStatus === "finished") {
-    console.log(`${player} pressed their button, but the game is already finished.`);
+    console.log(`${rawPlayer} pressed their button, but the game is already finished.`);
     return;
   }
-  if (!PLAYERS.includes(player)) {
-    console.log(`Received a press from unrecognized player "${player}".`);
+
+  const player = PLAYERS.find(
+    (p) => p.toLowerCase() === (rawPlayer || "").toLowerCase()
+  );
+
+  if (!player) {
+    console.log(`Received a press from unrecognized player "${rawPlayer}".`);
     return;
   }
+
   if (pressesRemaining[player] <= 0) {
     console.log(`${player} tried to press their button but has 0 presses remaining.`);
     return;
@@ -140,26 +155,53 @@ function handleDedicateMessage(payload) {
     console.log(`${player} tried to dedicate to an unrecognized player "${recipientRaw}".`);
     return;
   }
-  if (!(amount > 0) || amount > MAX_MUFFINS) {
-    console.log(`${player} sent an out-of-range dedication amount (${amount}).`);
+
+  // --- NEW CAP LOGIC START ---
+
+  // 1. Calculate how many muffins this player has currently dedicated to EVERYONE ELSE
+  let currentTotalToOthers = 0;
+  for (const target of PLAYERS) {
+    if (target !== recipient) {
+      currentTotalToOthers += (dedicationMax[player][target] || 0);
+    }
+  }
+
+  // 2. See how much room they have left out of their 6-muffin total quota
+  const allowedMaxForThisRecipient = 6.0 - currentTotalToOthers;
+
+  // If they have already completely spent their 6 muffins elsewhere, drop the request
+  if (allowedMaxForThisRecipient <= 0) {
+    console.log(`${player} has already hit their global 6-muffin limit.`);
     return;
   }
+
+  // 3. Apply the cap: if their request goes over what's left, forcefully squeeze it down to the cap
+  let finalAmount = amount;
+  if (finalAmount > allowedMaxForThisRecipient) {
+    finalAmount = allowedMaxForThisRecipient;
+    console.log(`${player}'s dedication to ${recipient} was capped at ${finalAmount} to respect the 6-muffin max.`);
+  }
+
+  // 4. Enforce your existing "must exceed previous highest to this specific person" rule
   const previousMax = dedicationMax[player][recipient];
-  if (amount <= previousMax) {
-    console.log(`${player} tried to dedicate ${amount} to ${recipient}, which doesn't exceed previous max.`);
+  if (finalAmount <= previousMax) {
+    console.log(`${player} tried to dedicate ${finalAmount} (capped) to ${recipient}, which doesn't exceed previous max of ${previousMax}.`);
     return;
   }
 
-  dedicationMax[player][recipient] = amount;
+  // --- NEW CAP LOGIC END ---
 
-  // --- NEW: Filter out any existing log item matching this specific from -> to pair ---
+  // Save the validated/capped amount
+  dedicationMax[player][recipient] = finalAmount;
+
+  // Filter out any existing log item matching this specific from -> to pair
   dedicationLog = dedicationLog.filter(d => !(d.from === player && d.to === recipient));
 
   dedicationLog.push({
     time: Date.now(),
     from: player,
     to: recipient,
-    amount: amount
+    amount: finalAmount // logs the capped version!
   });
 }
 

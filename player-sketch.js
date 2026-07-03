@@ -17,13 +17,17 @@ let channelReady = false;
 
 let pressesText, statusText;
 let amountInput, nameInput;
-let measureSpan; // hidden element used to measure typed text width
+let measureSpan;
 
 function setup() {
-  noCanvas(); // this page is just a simple form, no drawing needed
-
+  noCanvas();
+  
   const params = new URLSearchParams(window.location.search);
-  playerName = params.get("player") || "Unknown";
+  const rawPlayerName = params.get("player") || "Unknown";
+
+  playerName = PLAYERS.find(
+    (p) => p.toLowerCase() === rawPlayerName.toLowerCase()
+  ) || "Unknown";
 
   createElement("h1", playerName);
 
