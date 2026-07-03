@@ -138,7 +138,7 @@ function checkForDuplicateName() {
     }
   }
   if (count > 1) {
-    statusText.html(`Warning: it looks like ${playerName} is connected multiple times `);
+    statusText.html(`warning! ${playerName} is connected multiple times`);
   }
 }
 
