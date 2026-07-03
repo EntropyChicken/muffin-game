@@ -23,8 +23,106 @@ let dedicationLog;    // [{ time, from, to, amount }], oldest first
 let channel;
 let channelStatusText = "connecting...";
 
+
+
+// FIREWORKS I MADE FROM LIKE... IDK. COVID DAYS. 7TH GRADE?
+let ganime = 0;
+let sanime = 222;
+let f = []; // Firework rockets array
+let p = []; // Exploded particles array
+
+class FireworkRocket {
+  constructor(nfx, nfyv, nft) {
+    this.x = nfx;
+    this.y = height; // Dynamically uses full canvas height instead of a static 640
+    this.yv = nfyv;
+    this.type = nft;
+  }
+  
+  draw() {
+    noStroke();
+    fill(random(123, 255));
+    ellipse(this.x, this.y, 3 - this.yv / 2, 4 - this.yv / 2);
+  }
+  
+  move() {
+    this.y += this.yv;
+    this.yv *= 0.98;
+  }
+  
+  nature(id) {
+    if (this.yv > -0.7) {
+      if (this.type === 1) {
+        let nextColors;
+        if (ganime < 120) {
+          nextColors = [random(0, 255), 255, random(0, 255)];
+        } else if (ganime > 240) {
+          nextColors = [255, random(50, 200), random(50, 200)];
+        } else {
+          nextColors = [random(0, 255), random(0, 255), 255];
+        }
+        for (let i = 0; i < 25; i++) {
+          let nangle = random(0, 360);
+          p.push(new FireworkParticle(this.x, this.y, random(-1, 2) * cos(nangle), random(-1, 2) * sin(nangle) - 3, nextColors));
+        }
+      } 
+      else if (this.type === 2) {
+        let nextcolorsmag = 255 * floor(random(0, 2));
+        for (let i = 225; i < 316; i += 5) {
+          p.push(new FireworkParticle(this.x, this.y, 1.5 * cos(i), 5 * sin(i) - 2, [255 - nextcolorsmag, nextcolorsmag, nextcolorsmag]));
+        }
+      } 
+      else if (this.type === 3) {
+        for (let i = 0; i < 361; i += 15) {
+          let nextcolors;
+          if (i % 2 === 0) { nextcolors = [255, 0, 0]; } 
+          else if (i % 4 === 1) { nextcolors = [255, 150, 0]; } 
+          else { nextcolors = [255, 230, 0]; }
+          p.push(new FireworkParticle(this.x, this.y, 2.5 * cos(i), 2 * sin(i) - 4, nextcolors));
+          p.push(new FireworkParticle(this.x, this.y, 1.5 * cos(i), 1.2 * sin(i) - 4, nextcolors));
+          p.push(new FireworkParticle(this.x, this.y, 0.8 * cos(i), 0.5 * sin(i) - 4, nextcolors));
+        }
+      }
+      f.splice(id, 1);
+    }
+  }
+}
+class FireworkParticle {
+  constructor(npx, npy, npxv, npyv, npcolor) {
+    this.x = npx;
+    this.y = npy;
+    this.xv = npxv;
+    this.yv = npyv;
+    this.color = [npcolor[0], npcolor[1], npcolor[2]];
+  }
+  
+  draw() {
+    noStroke();
+    fill(this.color[0], this.color[1], this.color[2], 280 - this.yv * 32);
+    ellipse(this.x, this.y, 10 - this.yv, 12 - this.yv);
+  }
+  
+  move() {
+    this.x += this.xv;
+    this.y += this.yv;
+    this.yv += 0.1;
+    this.xv *= 0.99;
+  }
+  
+  nature(id) {
+    if (this.yv > 6) {
+      p.splice(id, 1);
+    }
+  }
+}
+
+
+
+
+
 function setup() {
   createCanvas(windowWidth, windowHeight);
+  angleMode(DEGREES); // Crucial for your cos() and sin() calculations to parse properly
   resetGameState();
   connectToSupabase();
 }
@@ -39,6 +137,10 @@ function resetGameState() {
   dedicationMax = {};
   dedicationLog = [];
 
+  // Reset particles
+  f = [];
+  p = [];
+
   for (const p of PLAYERS) {
     pressesRemaining[p] = MAX_PRESSES;
     dedicationMax[p] = {};
@@ -51,7 +153,6 @@ function resetGameState() {
 function connectToSupabase() {
   channel = supabaseClient.channel(CHANNEL_NAME);
 
-  // 1. ADD THIS LISTENER SO THE GM ACTUALLY HEARS THE PLAYER JOIN
   channel.on("broadcast", { event: EVENTS.JOIN }, (msg) => {
     handleJoinMessage(msg.payload);
   });
@@ -67,7 +168,6 @@ function connectToSupabase() {
   channel.subscribe((status) => {
     channelStatusText = status;
     
-    // Auto-reset hook from earlier
     if (status === "SUBSCRIBED") {
       channel.send({
         type: "broadcast",
@@ -101,6 +201,7 @@ function handleJoinMessage(payload) {
     }
   });
 }
+
 function handlePressMessage(payload) {
   const rawPlayer = payload && payload.player;
 
@@ -154,9 +255,6 @@ function handleDedicateMessage(payload) {
     return;
   }
 
-  
-
-  // math for capping at 6
   let currentTotalToOthers = 0;
   for (const target of PLAYERS) {
     if (target !== recipient) {
@@ -180,17 +278,13 @@ function handleDedicateMessage(payload) {
     return;
   }
 
-  
-
-
-
   dedicationMax[player][recipient] = finalAmount;
   dedicationLog = dedicationLog.filter(d => !(d.from === player && d.to === recipient));
   dedicationLog.push({
     time: Date.now(),
     from: player,
     to: recipient,
-    amount: finalAmount // logs the capped version!
+    amount: finalAmount
   });
 }
 
@@ -199,7 +293,7 @@ function handleDedicateMessage(payload) {
 function draw() {
   checkWinCondition();
 
-  drawBackgroud();
+  drawBackground();
   drawTimerAndRunner();
   drawPlayerList();
   if (gameStatus === "finished") {
@@ -207,6 +301,56 @@ function draw() {
   }
   drawDedicationLog();
   drawConnectionStatus();
+}
+
+// --- RENDERING HOOKS FOR BACKGROUNDS & TRAIL GENERATION ---
+function drawBackground() {
+  if (gameStatus === "finished") {
+    // Semi-transparent overlay allows fireworks to leave motion trails
+    fill(0, 40);
+    rect(0, 0, width, height);
+    runFireworkEngine();
+  } 
+  else if (currentRunner === null) {
+    background(50);
+  } 
+  else {
+    background(0);
+  }
+}
+
+function runFireworkEngine() {
+  // Incremental timing cycles
+  if (ganime < 360) { ganime++; } else { ganime = 1; }
+  if (sanime < 360) { sanime += 0.2; } else { sanime = 0.2; }
+  
+  if (sanime < 320) {
+    if (sanime < 50) {
+      if (ganime % 7 === 2) {
+        f.push(new FireworkRocket(random(50, width - 50), -10, 2));
+      }
+    } 
+    else if (ganime % 16 === 7) {
+      f.push(new FireworkRocket(random(100, width - 100), random(-6, -15), 1));
+    }
+  } 
+  else if (round(sanime) === 330) {
+    // Giant type 3 clusters
+    f.push(new FireworkRocket(100 + ((width - 200) / 7) * (ganime % 5), 3 * abs(ganime % 5 - 2) - 10, 3));
+    f.push(new FireworkRocket(width-(100 + ((width - 200) / 7) * (ganime % 5)), 3 * abs(ganime % 5 - 2) - 10, 3));
+  }
+
+  // Loop backward through active arrays to safely splice out expired values
+  for (let i = f.length - 1; i >= 0; i--) {
+    f[i].move();
+    f[i].draw();
+    f[i].nature(i);
+  }
+  for (let i = p.length - 1; i >= 0; i--) {
+    p[i].move();
+    p[i].draw();
+    p[i].nature(i);
+  }
 }
 
 function checkWinCondition() {
@@ -260,18 +404,6 @@ function playerListEndY() {
   return playerListStartY() + 22 + PLAYERS.length * 35 + 35;
 }
 
-function drawBackgroud() {
-  if (gameStatus === "finished") {
-    background(30);
-  } 
-  else if (currentRunner === null) {
-    // Checks if currentRunner is strictly null
-    background(50);
-  } 
-  else {
-    background(0);
-  }
-}
 function drawPlayerList() {
   textFont("monospace");
   textAlign(LEFT, TOP);
@@ -302,7 +434,7 @@ function countPayoutLines() {
     if (p === winner) continue;
     if ((dedicationMax[winner][p] || 0) > 0) n++;
   }
-  return n + 1; // +1 for the "<winner> keeps X muffins" line
+  return n + 1;
 }
 
 function payoutEndY() {
@@ -372,10 +504,8 @@ function drawDedicationLog() {
     y += 35;
   }
 
-  // Draw the remaining dedications row by row without timestamps
   fill(200);
   for (const d of itemsToRender) {
-    // UPDATED: No timestamp generation, cleaner layout output
     text(`${d.from} to ${d.to}: ${formatMuffins(d.amount)}`, x, y);
     y += 35;
   }
@@ -394,7 +524,7 @@ function getTimeColor() {
   let timeLeft = max(0, timerEndTime - Date.now());
   let progress = timeLeft / totalTime;
   colorMode(HSB, 360, 100, 100);
-  let timeColor = color((max(progress * 250-10,0)+360)%360,72,100);
+  let timeColor = color((max(progress * 250 - 10, 0) + 360) % 360, 72, 100);
   colorMode(RGB, 255);
   return timeColor;
 }
