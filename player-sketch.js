@@ -220,8 +220,8 @@ function handleDedicate() {
     return;
   }
 
-  if (amount < 0 || amount > 6) {
-    statusText.html("ERROR: Dedication must be between 0 and 6 muffins.");
+  if (amount < 0 || amount > MAX_MUFFINS) {
+    statusText.html(`ERROR: Dedication must be between 0 and ${MAX_MUFFINS} muffins.`);
     return;
   }
 

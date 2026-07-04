@@ -435,15 +435,15 @@ function handleDedicateMessage(payload) {
     }
   }
 
-  const allowedMaxForThisRecipient = 6.0 - currentTotalToOthers;
+  const allowedMaxForThisRecipient = MAX_MUFFINS - currentTotalToOthers;
   if (allowedMaxForThisRecipient <= 0) {
-    console.log(`${player} has already hit their global 6-muffin limit.`);
+    console.log(`${player} has already hit their global ${MAX_MUFFINS}-muffin limit.`);
     return;
   }
   let finalAmount = amount;
   if (finalAmount > allowedMaxForThisRecipient) {
     finalAmount = allowedMaxForThisRecipient;
-    console.log(`${player}'s dedication to ${recipient} was capped at ${finalAmount} to respect the 6-muffin max.`);
+    console.log(`${player}'s dedication to ${recipient} was capped at ${finalAmount} to respect the ${MAX_MUFFINS}-muffin max.`);
   }
   const previousMax = dedicationMax[player][recipient];
   if (finalAmount <= previousMax) {
