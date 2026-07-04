@@ -608,16 +608,16 @@ function drawTimerAndRunner() {
   text(formatTimer(getRemainingSeconds()), width / 2, 30);
   
   fill(255);
-  textSize(34);
+  textSize(60);
   if (gameStatus === "finished") {
     fill(255, 182, 0);
-    text(`WINNER: ${winner}`, width / 2, 150);
+    text(`WINNER: ${winner}`, width / 2, 142);
   } else if (currentRunner) {
     fill(getTimeColor());
-    text(`Runner: ${currentRunner}`, width / 2, 150);
+    text(`Runner: ${currentRunner}`, width / 2, 142);
   } else {
     fill(150);
-    text("No runner yet", width / 2, 150);
+    text("No runner yet", width / 2, 142);
   }
 }
 
