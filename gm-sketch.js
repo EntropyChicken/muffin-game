@@ -782,7 +782,7 @@ function drawBackground() {
     
     if(getRemainingSeconds()>10){
       drawWaitingRoom(1.002,0.08,1,0.1,getTimeColor());
-      background(0,map(sq(map(getRemainingSeconds(),10,runDurationSeconds,1,0)),1,0,255,150));
+      background(0,max(150,map(sqrt(map(getRemainingSeconds(),10,runDurationSeconds,0,1)),0,1,255,50)));
     }
     else{
       background(0);
