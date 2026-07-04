@@ -1,89 +1,146 @@
 /* =========================================================
    MUFFIN GAME — shared.js
-   Loaded by index.html, index.html, and gm.html.
-   Holds: Supabase setup, game constants, and the dedication
-   text parser (both pages need to agree on this format).
+   Shared configuration, helpers, parser, and message types.
+   Loaded by both the Game Master and Player clients.
    ========================================================= */
 
-// ---- 1) SUPABASE CONFIG ---------------------------------------------------
-// Fill these in with your own project's values:
-// Supabase Dashboard -> Project Settings -> API
-const SUPABASE_URL = "https://hwwthixvanursqmxebfq.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_zK-_D68FVdDzmMVUsPppBg_rJa7s0Mj";
+// ==========================================================
+// SUPABASE CONFIG
+// ==========================================================
 
-// One shared client, used by whichever page loads this file.
-const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseUrl = "https://hwwthixvanursqmxebfq.supabase.co";
+const supabaseAnonKey = "sb_publishable_zK-_D68FVdDzmMVUsPppBg_rJa7s0Mj";
 
-// Every player page and the GM page join this same channel name.
-const CHANNEL_NAME = "muffin-game-channel";
+const supabaseClient = supabase.createClient(
+	supabaseUrl,
+	supabaseAnonKey
+);
 
-// ---- 2) GAME CONSTANTS & VARIABLES ------------------------------------------
+const channelName = "muffin-game-channel";
+
+
+// ==========================================================
+// GLOBAL GAME SETTINGS
+// (Game Master overwrites these at startup and syncs them)
+// ==========================================================
+
 let maxPresses = 5;
 let runDurationSeconds = 100;
 let maxMuffins = 6;
 
 
-// The players in this game. Edit this list for your session
-// (names here must exactly match, ignoring case, what you hand
-// out as ?player=NAME links, and what people type in dedications).
-let players = []; 
+// ==========================================================
+// SHARED GAME STATE
+// ==========================================================
 
-// ---- 3) MESSAGE TYPES -------------------------------------------------------
+let players = [];
+
+
+// ==========================================================
+// NETWORK EVENT NAMES
+// ==========================================================
+
 const EVENTS = {
-  PRESS: "press",
-  DEDICATE: "dedicate",
-  JOIN: "join",        
-  STATE_SYNC: "state_sync",
-  REQUEST_NAME: "request_name",
-  APPROVE: "approve",
-  DENY: "deny",
-  SETTINGS_SYNC: "settings_sync",
-  DEDICATIONS_SYNC: "dedications_sync",
-  DEDICATE_ERROR: "dedicate_error"
+	PRESS: "press",
+	DEDICATE: "dedicate",
+	JOIN: "join",
+
+	STATE_SYNC: "state_sync",
+	SETTINGS_SYNC: "settings_sync",
+	DEDICATIONS_SYNC: "dedications_sync",
+
+  REQUEST_ROSTER: "REQUEST_ROSTER",
+	REQUEST_NAME: "request_name",
+	APPROVE: "approve",
+	DENY: "deny",
+
+	DEDICATE_ERROR: "dedicate_error",
+
+	GAME_RESET: "game_reset"
 };
 
-// ---- 4) DEDICATION TEXT FORMAT ----------------------------------------------
-// Required phrasing (case-insensitive), e.g.:
-//   "I officially dedicate 5.3 muffins to Charlie"
-//   "I officially dedicate 1 muffin to Bob"
-const DEDICATION_REGEX = /^i officially dedicate\s+([0-9]*\.?[0-9]+)\s+muffins?\s+to\s+(.+?)\s*$/i;
 
-// Parses free text typed by a player.
-// Returns { amount, recipientRaw } on success, or null if the
-// text doesn't match the required format at all.
+// ==========================================================
+// DEDICATION PARSER
+// ==========================================================
+
+const dedicationRegex =
+	/^i officially dedicate\s+([0-9]*\.?[0-9]+)\s+muffins?\s+to\s+(.+?)\s*$/i;
+
 function parseDedicationText(text) {
-  if (!text) return null;
-  const match = text.trim().match(DEDICATION_REGEX);
-  if (!match) return null;
-  const amount = parseFloat(match[1]);
-  if (isNaN(amount)) return null;
-  const recipientRaw = match[2].trim();
-  if (!recipientRaw) return null;
-  return { amount, recipientRaw };
+
+	if (!text) return null;
+
+	const match = text.trim().match(dedicationRegex);
+
+	if (!match) {
+		return null;
+	}
+
+	const amount = parseFloat(match[1]);
+
+	if (isNaN(amount)) {
+		return null;
+	}
+
+	const recipientRaw = match[2].trim();
+
+	if (!recipientRaw.length) {
+		return null;
+	}
+
+	return {
+		amount,
+		recipientRaw
+	};
 }
 
-// ---- 5) FORMATTING HELPERS ---------------------------------------------------
-function formatTimer(n) {
-  if(n<20){
-    return Number(n).toFixed(1);
-  }
-    else{
-      return floor(n);
-  }
+
+// ==========================================================
+// TIMER FORMATTER
+// ==========================================================
+
+function formatTimer(seconds) {
+
+	if (seconds < 20) {
+		return Number(seconds).toFixed(1);
+	}
+
+	return floor(seconds);
 }
 
-function formatMuffins(n) {
-  if(n<1e-10){
-    return n;
-  }
-  return parseFloat(n.toFixed(12)).toString();
+
+// ==========================================================
+// MUFFIN FORMATTER
+// ==========================================================
+
+function formatMuffins(amount) {
+
+	if (Math.abs(amount) < 1e-10) {
+		return "0";
+	}
+
+	return parseFloat(amount.toFixed(12)).toString();
 }
+
+
+// ==========================================================
+// SHA-256 PASSWORD HASHING
+// ==========================================================
 
 async function sha256HashHex(text) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(text);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
+
+	const encoder = new TextEncoder();
+
+	const data = encoder.encode(text);
+
+	const hashBuffer =
+		await crypto.subtle.digest("SHA-256", data);
+
+	const hashArray =
+		Array.from(new Uint8Array(hashBuffer));
+
+	return hashArray
+		.map(b => b.toString(16).padStart(2, "0"))
+		.join("");
 }

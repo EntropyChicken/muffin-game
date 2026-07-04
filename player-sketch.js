@@ -143,10 +143,9 @@ function renderRegistrationUI(attemptedName) {
 }
 
 function connectToSupabase() {
-  channel = supabaseClient.channel(CHANNEL_NAME);
-  
-  channel.on("broadcast", { event: "GAME_RESET" }, () => {
-    window.location.reload(); 
+  channel = supabaseClient.channel(channelName);
+  channel.on("broadcast", { event: EVENTS.GAME_RESET }, () => {
+    window.location.reload();
   });
 
   channel.on("broadcast", { event: EVENTS.STATE_SYNC }, (msg) => {
@@ -177,7 +176,7 @@ function connectToSupabase() {
   });
   channel.on("broadcast", { event: EVENTS.DEDICATE_ERROR }, (msg) => {
     if (msg.payload && msg.payload.player === playerName) {
-      if (statusText) statusText.html(msg.payload.message);
+      if (statusText) statusText.html("<span style='color:#ff6666'>" +msg.payload.message +"</span>");
     }
   });
   channel.on("broadcast", { event: EVENTS.DEDICATIONS_SYNC }, (msg) => {
@@ -194,7 +193,7 @@ function connectToSupabase() {
       setTimeout(() => {
         channel.send({
           type: "broadcast",
-          event: "REQUEST_ROSTER",
+          event: EVENTS.REQUEST_ROSTER,
           payload: {}
         });
       }, 500);
@@ -246,7 +245,7 @@ function handleDedicate() {
     payload: { player: playerName, amount: amount, recipient: name }
   });
 
-  statusText.html(`Sent dedication request: ${amount} muffins to ${name}.`);
+  statusText.html(`Requested dedication of ${formatMuffins(amount)} muffins to ${name}.`);
 }
 
 function initializeActivePlayerPodium() {
@@ -256,25 +255,55 @@ function initializeActivePlayerPodium() {
   document.body.innerHTML = "";
 
   mainLayout = createDiv();
-  mainLayout.style('display', 'flex');
-  mainLayout.style('justify-content', 'space-between');
-  mainLayout.style('width', '100%');
-  mainLayout.style('max-width', '1200px');
-  mainLayout.style('margin', '0 auto');
-  mainLayout.style('padding', '20px');
-  mainLayout.style('box-sizing', 'border-box');
+  mainLayout.style("display","grid");
+  mainLayout.style("grid-template-columns","1fr 2fr 1fr");
+  mainLayout.style("gap","40px");
+  mainLayout.style("width","100%");
+  mainLayout.style("max-width","1500px");
+  mainLayout.style("margin","0 auto");
+  mainLayout.style("padding","20px");
+  mainLayout.style("align-items","start");
 
   leftCol = createDiv().parent(mainLayout);
   leftCol.style('flex', '1').style('text-align', 'left').style('padding', '0 20px');
-  leftCol.html("<h3 style='color: #ffb600; font-family: monospace;'>Dedications FROM Others</h3><div id='from-list' style='font-family: monospace; color: #ddd;'><p>Loading...</p></div>");
+  leftCol.html(`
+  <h2 style="
+  font-family:monospace;
+  color:#ffb600;
+  margin-bottom:15px;">
+  Dedications FROM Others
+  </h2>
 
+  <div id="from-list"
+  style="
+  font-family:monospace;
+  font-size:22px;
+  line-height:1.7;">
+  Loading...
+  </div>
+  `);
+  
   centerCol = createDiv().parent(mainLayout);
   centerCol.style('flex', '2').style('text-align', 'center');
 
   rightCol = createDiv().parent(mainLayout);
   rightCol.style('flex', '1').style('text-align', 'right').style('padding', '0 20px');
-  rightCol.html("<h3 style='color: #ffb600; font-family: monospace;'>Dedications TO Others</h3><div id='to-list' style='font-family: monospace; color: #ddd;'><p>Loading...</p></div>");
+  rightCol.html(`
+  <h2 style="
+  font-family:monospace;
+  color:#ffb600;
+  margin-bottom:15px;">
+  Dedications TO Others
+  </h2>
 
+  <div id="to-list"
+  style="
+  font-family:monospace;
+  font-size:22px;
+  line-height:1.7;">
+  Loading...
+  </div>
+  `);
   createElement("h1", playerName).parent(centerCol);
 
   pressesText = createP(pressesLabel()).parent(centerCol);
@@ -334,28 +363,45 @@ function renderDedicationsLists(dedicationMax) {
   
   let fromHtml = "";
   let toHtml = "";
-  
+
   for (const p of players) {
+
     if (p === playerName) continue;
-    let amt = dedicationMax[p] && dedicationMax[p][playerName] ? dedicationMax[p][playerName] : 0;
+
+    const amt =
+      dedicationMax[p]?.[playerName] ?? 0;
+
     if (amt > 0) {
-      fromHtml += `<p>${p}: <b>${formatMuffins(amt)}</b></p>`;
-    }
-  }
-  
-  let myDeds = dedicationMax[playerName];
-  if (myDeds) {
-    for (const p of players) {
-      if (p === playerName) continue;
-      let amt = myDeds[p] || 0;
-      if (amt > 0) {
-        toHtml += `<p>${p}: <b>${formatMuffins(amt)}</b></p>`;
-      }
+      fromHtml += `
+      <div>
+        <b>${p}</b><br>
+        ${formatMuffins(amt)} muffins
+      </div><br>`;
     }
   }
 
-  document.getElementById('from-list').innerHTML = fromHtml || "<p style='color:#777'>(none yet)</p>";
-  document.getElementById('to-list').innerHTML = toHtml || "<p style='color:#777'>(none yet)</p>";
+  const mine = dedicationMax[playerName] || {};
+
+  for (const p of players) {
+
+    if (p === playerName) continue;
+
+    const amt = mine[p] || 0;
+
+    if (amt > 0) {
+      toHtml += `
+      <div>
+        <b>${p}</b><br>
+        ${formatMuffins(amt)} muffins
+      </div><br>`;
+    }
+  }
+
+  document.getElementById("from-list").innerHTML =
+    fromHtml || "<span style='color:#777'>(none)</span>";
+
+  document.getElementById("to-list").innerHTML =
+    toHtml || "<span style='color:#777'>(none)</span>";
 }
 
 function autoGrowInput(inputElem) {

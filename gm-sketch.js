@@ -32,6 +32,11 @@ let channelStatusText = "connecting...";
 
 let timeSpeedMultiplier = 10;
 let buttonPressFlash = 0;
+let playerWealth = {};
+let leaderboardHeld = false;
+let payoutAppliedThisRound = false;
+
+let nextRoundButton;
 
 // FIREWORKS I MADE FROM LIKE... IDK. COVID DAYS. 7TH GRADE? LOLLLLLL
 let ganime = 0;
@@ -141,6 +146,10 @@ async function setup() {
     return;
   }
 
+  nextRoundButton = createButton("Start Next Round");
+  nextRoundButton.position(20,20);
+  nextRoundButton.mousePressed(startNextRound);
+
   addPlayerInput = createInput("");
   addPlayerInput.attribute("placeholder", "Add player name...");
   addPlayerInput.style("position", "fixed");
@@ -184,6 +193,7 @@ async function checkGMPasswordHashed() {
 
     let qrLabel = createP("QR CODE FOR PLAYERS:").parent(overlay);
     qrLabel.style('color', '#ffffff'); qrLabel.style('font-size', '24px'); qrLabel.style('margin', '0');
+    qrLabel.style("font-size","24px");
 
     let qrCodeImg = createImg('join_qrcode.png', 'Player QR Code').parent(overlay);
     qrCodeImg.style('width', '300px');
@@ -192,6 +202,7 @@ async function checkGMPasswordHashed() {
 
     let settingsLabel = createP("SETTINGS FOR GAME:").parent(overlay);
     settingsLabel.style('color', '#ffffff'); settingsLabel.style('font-size', '18px'); settingsLabel.style('margin', '0');
+    settingsLabel.style("font-size","24px");
 
     let settingsRow = createDiv().parent(overlay);
     settingsRow.style('display', 'flex'); settingsRow.style('gap', '10px');
@@ -213,6 +224,7 @@ async function checkGMPasswordHashed() {
 
     let passLabel = createP("PASSWORD FOR GAME MASTER:").parent(overlay);
     passLabel.style('color', '#ffffff'); passLabel.style('font-size', '24px'); passLabel.style('margin', '15px 0 0 0');
+    passLabel.style("font-size","24px");
 
     let passInput = createInput("").parent(overlay);
     passInput.attribute("type", "password");
@@ -264,6 +276,7 @@ function resetGameState() {
   currentRunner = null;
   timerEndTime = Date.now() + runDurationSeconds * 1000;
   winner = null;
+  payoutAppliedThisRound = false;
 
   pressesRemaining = {};
   dedicationMax = {};
@@ -271,8 +284,11 @@ function resetGameState() {
 
   f = [];
   p = [];
-
   for (const p of players) {
+    const key = p.toLowerCase();
+    if (!(key in playerWealth)) {
+      playerWealth[key] = 0;
+    }
     pressesRemaining[p] = maxPresses;
     dedicationMax[p] = {};
     for (const q of players) {
@@ -282,7 +298,7 @@ function resetGameState() {
 }
 
 function connectToSupabase() {
-  channel = supabaseClient.channel(CHANNEL_NAME);
+  channel = supabaseClient.channel(channelName);
   channel.on("broadcast", { event: EVENTS.JOIN }, (msg) => {
     handleJoinMessage(msg.payload);
   });
@@ -378,6 +394,9 @@ function registerNewPlayer() {
   }
 
   players.push(newName);
+  if (!(newName.toLowerCase() in playerWealth)) {
+    playerWealth[newName.toLowerCase()] = 0;
+  }
   pressesRemaining[newName] = maxPresses;
   dedicationMax[newName] = {};
 
@@ -545,6 +564,10 @@ function draw() {
   }
   drawDedicationLog();
   drawConnectionStatus();
+  
+  if (leaderboardHeld) {
+    drawLeaderboard();
+  }
 }
 
 function drawWaitingRoom() {
@@ -622,9 +645,48 @@ function checkWinCondition() {
 
     if (Date.now() >= timerEndTime) {
       gameStatus = "finished";
-      winner = currentRunner; 
+      winner = currentRunner || null;
+      if (!payoutAppliedThisRound) {
+        payoutAppliedThisRound = true;
+        applyRoundPayout();
+      }
     }
   }
+}
+function applyRoundPayout() {
+
+	if (winner) {
+
+		let totalDedicated = 0;
+
+		for (const p of players) {
+
+			if (p === winner) continue;
+
+			const amt = dedicationMax[winner][p] || 0;
+
+			totalDedicated += amt;
+
+			playerWealth[p.toLowerCase()] += amt;
+		}
+
+		playerWealth[winner.toLowerCase()] +=
+			maxMuffins - totalDedicated;
+	}
+	else {
+
+		let total = 6;
+
+		for (const p of players) {
+			total += playerWealth[p.toLowerCase()];
+		}
+
+		const each = (players.length === 0 ? 0 : total / players.length);
+
+		for (const p of players) {
+			playerWealth[p.toLowerCase()] = each;
+		}
+	}
 }
 
 function getRemainingSeconds() {
@@ -653,7 +715,7 @@ function drawTimerAndRunner() {
   textSize(60);
   if (gameStatus === "finished") {
     fill(255, 182, 0);
-    text(winner ? `WINNER: ${winner}` : "WINNER: Nobody", width / 2, 142);
+    text(winner ? `WINNER: ${winner}` : "WINNER: the concept of wealth redistribution", width / 2, 142);
   } else if (currentRunner) {
     fill(getTimeColor());
     text(`Runner: ${currentRunner}`, width / 2, 142);
@@ -876,4 +938,42 @@ function renderRequestConsole() {
     requestElements.push(btn);
     currentX += btn.elt.offsetWidth + 12; 
   }
+}
+
+function startNextRound() {
+	resetGameState();
+	channel.send({
+		type:"broadcast",
+		event:EVENTS.GAME_RESET,
+		payload:{}
+	});
+}
+
+function drawLeaderboard(){
+	push();
+	fill(0,190);
+	rect(0,0,width,height);
+	fill(255);
+	textAlign(CENTER,TOP);
+	textSize(40);
+	text("LEADERBOARD",width/2,30);
+	const standings = Object.entries(playerWealth).sort((a,b)=>b[1]-a[1]);
+	textAlign(LEFT,TOP);
+	textSize(28);
+	let y=100;
+	for(const [name,wealth] of standings){
+		text(name+": "+formatMuffins(wealth),80,y);
+		y+=36;
+	}
+	pop();
+}
+
+function keyPressed(){
+	if(key==="l"||key==="L")
+		leaderboardHeld=true;
+}
+
+function keyReleased(){
+	if(key==="l"||key==="L")
+		leaderboardHeld=false;
 }
