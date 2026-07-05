@@ -179,7 +179,7 @@ async function setup() {
   nextRoundButton.mousePressed(startNextRound);
 
   addPlayerInput = createInput("");
-  addPlayerInput.attribute("placeholder", "Remove player");
+  addPlayerInput.attribute("placeholder", "Add / Kick...");
   addPlayerInput.style("position", "fixed");
   addPlayerInput.style("bottom", "20px");
   addPlayerInput.style("right", "144px");
@@ -840,7 +840,7 @@ function drawBackground() {
     
     if(getRemainingSeconds()>10){
       drawWaitingRoom(1.0015,0.06,1,0.1,getTimeColor());
-      background(0,max(170,map(sqrt(map(getRemainingSeconds(),10,runDurationSeconds,0,1)),0,1,255,100)));
+      background(0,max(190,map(sqrt(map(getRemainingSeconds(),10,runDurationSeconds,0,1)),0,1,255,100)));
     }
     else{
       background(0);
@@ -1020,8 +1020,8 @@ function drawTimerAndRunner() {
     fill(getTimeColor());
     textBox(`Runner: ${currentRunner}`, width / 2, 142);
   } else {
-    fill(150);
-    textBox("Runner: nobody yet", width / 2, 142);
+    fill(130,150);
+    textBox("Runner: (nobody yet)", width / 2, 142);
   }
 }
 
@@ -1036,17 +1036,17 @@ function playerListEndY() {
 function drawPlayerList() {
   textFont("monospace");
   textAlign(LEFT, TOP);
-  textSize(28);
+  textSize(32);
 
   const x = 30;
   let y = playerListStartY();
 
-  fill(200);
+  fill(222);
   textBox("PLAYERS:", x, y);
   y += 35;
   
   if (players.length === 0) {
-    fill(120);
+    fill(130,150);
     textBox("(none yet)", x, y);
     return;
   }
@@ -1095,7 +1095,7 @@ function drawPayout() {
   
   textFont("monospace");
   textAlign(LEFT, TOP);
-  textSize(28);
+  textSize(32);
 
   const x = 30;
   let y = playerListEndY();
@@ -1121,17 +1121,17 @@ function drawPayout() {
 function drawDedicationLog() {
   textFont("monospace");
   textAlign(LEFT, TOP);
-  textSize(28);
+  textSize(32);
   
   const x = width / 2;
   let y = playerListStartY(); 
 
-  fill(200);
+  fill(222);
   textBox("DEDICATIONS:", x, y);
   y += 35;
 
   if (dedicationLog.length === 0) {
-    fill(120);
+    fill(130,150);
     textBox("(none yet)", x, y);
     return;
   }
@@ -1154,7 +1154,7 @@ function drawDedicationLog() {
     y += 35;
   }
 
-  fill(200);
+  fill(222);
   for (const d of itemsToRender) {
     textBox(`${d.from} to ${d.to}: ${formatMuffins(d.amount)}`, x, y);
     y += 35;
@@ -1272,7 +1272,7 @@ function drawLeaderboard(){
   
   // Set the text size BEFORE measuring textWidth, otherwise the measurements will be wrong!
   textAlign(LEFT, TOP);
-  textSize(28);
+  textSize(32);
 
   // --- PASS 1: Calculate ranks and track max text widths ---
   let leaderboardRows = [];

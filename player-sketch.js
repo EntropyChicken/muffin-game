@@ -619,13 +619,13 @@ function pressesLabel() {
     return `${pressesRemainingLocal} / ${maxPresses} presses left`;
   }
   else{
-    return "awaiting data update...";
+    return "...awaiting connection... (refresh if stuck)";
   }
 }
 
 function handlePress() {
   if (!channelReady) {
-    statusText.html("Still connecting, try again in a moment...");
+    statusText.html("...awaiting connection...");
     return;
   }
   if (pressesRemainingLocal <= 0) {
