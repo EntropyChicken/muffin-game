@@ -121,25 +121,34 @@ html, body {
 }
 
 .press-btn {
-  display: block;          /* Puts it on its own line below the inputs */
-  width: 100%;             /* Makes it stretch across the whole container */
+  display: block;
+  width: 100%;
   font-size: 36px;
   padding: 12px 24px;
-  background: var(--accent); /* Uses your beautiful gold/yellow accent color */
-  color: #1a1a1a;          /* Dark text color so it contrast perfectly */
-  border: none;            /* Removes the ugly default browser border */
-  border-radius: 8px;      /* Smooth, rounded corners matching your layout */
-  cursor: pointer;         /* Makes the mouse turn into a hand pointer */
-  font-weight: 600;        /* Makes the text slightly bold */
-  margin: 15px auto 0 auto; /* Centers it and adds some breathing room on top */
+  /* Change the background here instead of JavaScript */
+  background: #5555ff; 
+  color: #1a1a1a;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  margin: 15px auto 0 auto;
+  /* Smooth transition for the glow effect */
+  transition: filter 0.1s ease, box-shadow 0.1s ease; 
 }
 
 @media (hover: hover) {
-  .dedicate-btn:hover,
-  .press-btn:hover {
+  .dedicate-btn:hover {
     filter: brightness(1.1);
   }
+  
+  /* Give the press button a stronger brightness boost AND a glow effect */
+  .press-btn:hover {
+    filter: brightness(1.3); 
+    box-shadow: 0 0 15px rgba(85, 85, 255, 0.6);
+  }
 }
+
 .dedicate-btn:active,
 .press-btn:active {
   filter: brightness(0.85);
