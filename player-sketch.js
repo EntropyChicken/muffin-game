@@ -28,6 +28,8 @@ let deviceSessionId = null;
 let sessionClaimPending = true;
 let pendingRosterMessage = null;
 let heartbeatIntervalId = null;
+let sessionClaimTimeoutId = null;
+let gmSeen = false;
 
 async function setup() {
   window.duplicateSessionUiRendered = false;
@@ -268,6 +270,7 @@ function connectToSupabase() {
   });
   channel.on("broadcast", { event: EVENTS.ROSTER_SYNC }, (msg) => {
     if (msg.payload && msg.payload.currentPlayers) {
+      gmSeen = true;
       players = msg.payload.currentPlayers; 
       pendingQueue = msg.payload.requestedNamesQueue || [];
       if (playerName !== "Unknown" && msg.payload.pressesRemaining) {
@@ -282,6 +285,7 @@ function connectToSupabase() {
     if (msg.payload.player.toLowerCase() !== rawPlayerName.toLowerCase()) return;
     if (msg.payload.sessionId !== deviceSessionId) return;
 
+    if (sessionClaimTimeoutId) { clearTimeout(sessionClaimTimeoutId); sessionClaimTimeoutId = null; }
     sessionClaimPending = false;
 
     if (!msg.payload.accepted) {
@@ -342,6 +346,17 @@ function connectToSupabase() {
             event: EVENTS.SESSION_CLAIM,
             payload: { player: rawPlayerName, sessionId: deviceSessionId }
           });
+
+          sessionClaimTimeoutId = setTimeout(() => {
+            sessionClaimTimeoutId = null;
+            // Only second-guess ourselves if we know a Game Master is
+            // actually online (we've seen a roster) - otherwise this is
+            // just the normal "nobody's started the game yet" wait.
+            if (sessionClaimPending && gmSeen && !window.duplicateSessionUiRendered) {
+              sessionClaimPending = false;
+              showDuplicateSessionScreen(activeDuplicateChannel);
+            }
+          }, SESSION_CLAIM_TIMEOUT_MS);
         } else {
           // No name in the URL at all - nothing to claim or verify.
           sessionClaimPending = false;

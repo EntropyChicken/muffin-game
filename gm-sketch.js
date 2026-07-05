@@ -328,15 +328,6 @@ function resetGameState() {
   }
 }
 
-// Resolves a SESSION_CLAIM request against the ledger.
-//
-// - No existing record, or the same device reclaiming its own name
-//   (reload, or coming back later - same localStorage id either way)
-//   -> always accepted, no matter how much time has passed.
-// - A different device claiming a name that's currently held
-//   -> rejected UNLESS the current holder has gone quiet for longer
-//      than SESSION_STALE_TIMEOUT_MS, in which case the new device
-//      takes over and the old one is told it's been revoked.
 function resolveSessionClaim(rawPlayerName, sessionId) {
   if (!rawPlayerName || !sessionId) return { accepted: false };
 
@@ -344,6 +335,7 @@ function resolveSessionClaim(rawPlayerName, sessionId) {
   const now = Date.now();
   const existing = sessionLedger[key];
 
+  // Accept if it's a brand new claim, or if the SAME device is reclaiming it
   if (!existing || existing.sessionId === sessionId) {
     sessionLedger[key] = {
       playerName: rawPlayerName,
@@ -354,13 +346,8 @@ function resolveSessionClaim(rawPlayerName, sessionId) {
     return { accepted: true };
   }
 
-  const isStale = (now - existing.lastSeen) > SESSION_STALE_TIMEOUT_MS;
-  if (isStale) {
-    const previousSessionId = existing.sessionId;
-    sessionLedger[key] = { playerName: rawPlayerName, sessionId, claimedAt: now, lastSeen: now };
-    return { accepted: true, tookOverFrom: previousSessionId };
-  }
-
+  // FIX: Never allow a different device to take over an existing session.
+  // This prevents the original player from being accidentally booted.
   return { accepted: false };
 }
 
@@ -404,12 +391,14 @@ function connectToSupabase() {
     const payload = msg.payload || {};
     const rawPlayerName = payload.player;
     const sessionId = payload.sessionId;
-    if (!rawPlayerName || !sessionId) return;
+    
+    // FIX: Don't silently return if sessionId is missing. 
+    // We must send a rejection back so the player doesn't hang forever.
+    if (!rawPlayerName) return; 
 
     const result = resolveSessionClaim(rawPlayerName, sessionId);
 
     if (result.accepted && result.tookOverFrom) {
-      // The previous holder went quiet too long - tell it to stand down.
       channel.send({
         type: "broadcast",
         event: EVENTS.SESSION_REVOKED,

@@ -29,20 +29,9 @@ let runDurationSeconds = 60;
 let maxPresses = 5;
 
 
-// ==========================================================
-// SESSION / DUPLICATE-LOGIN CONFIG
-//
-// Every browser gets one persistent "device session id" (see
-// getOrCreateDeviceSessionId below) that survives reloads AND
-// fully closing/reopening the tab. The Game Master is the sole
-// authority on who currently owns a player name: it stamps a
-// claim time using its own clock, and only lets a *different*
-// device take over a name once the current holder has gone
-// quiet for longer than SESSION_STALE_TIMEOUT_MS.
-// ==========================================================
-
 const SESSION_HEARTBEAT_INTERVAL_MS = 5000;
-const SESSION_STALE_TIMEOUT_MS = 18000; // ~3-4 missed heartbeats
+const SESSION_STALE_TIMEOUT_MS = 18000; // no longer used for auto-takeover, kept for reference
+const SESSION_CLAIM_TIMEOUT_MS = 6000;
 
 
 // ==========================================================
