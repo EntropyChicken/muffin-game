@@ -224,7 +224,7 @@ async function checkGMPasswordHashed() {
     overlay.style('z-index', '99999');
     overlay.style('font-family', 'monospace');
 
-    let qrLabel = createP("QR CODE FOR PLAYERS:").parent(overlay);
+    let qrLabel = createP("PLAYER JOIN CODE:").parent(overlay);
     qrLabel.style('color', '#ffffff'); qrLabel.style('font-size', '24px'); qrLabel.style('margin', '0');
     qrLabel.style("font-size","24px");
 
