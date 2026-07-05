@@ -73,7 +73,7 @@ async function setup() {
         errorBox.style("padding", "20px");
 
         createElement("h1", "Access Denied").parent(errorBox);
-        let alertText = createP(`<span style="color:#ff6666; font-weight:bold;">DUPLICATE SESSION DETECTED.</span><br>"${rawPlayerName}" is already actively playing in another window or tab.`);
+        let alertText = createP(`<span style="color:#ff6666; font-weight:bold;">😭duplicate session🥀</span><br>"${rawPlayerName}" is already actively playing in another window or tab.`);
         alertText.parent(errorBox);
         alertText.style("margin-bottom", "30px");
         alertText.style("line-height", "1.6");

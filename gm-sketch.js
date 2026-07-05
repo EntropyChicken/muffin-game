@@ -226,7 +226,7 @@ async function checkGMPasswordHashed() {
     qrCodeImg.style('height', '300px');
     qrCodeImg.style('margin-bottom', '20px');
 
-    let settingsLabel = createP("SETTINGS FOR GAME:").parent(overlay);
+    let settingsLabel = createP("SETTINGS:").parent(overlay);
     settingsLabel.style('color', '#ffffff'); settingsLabel.style('font-size', '18px'); settingsLabel.style('margin', '0');
     settingsLabel.style("font-size","24px");
 
@@ -248,7 +248,7 @@ async function checkGMPasswordHashed() {
     pressesInput.style('padding', '8px'); pressesInput.style('font-size', '16px'); pressesInput.style('width', '120px');
     pressesInput.style('text-align', 'center'); pressesInput.style('background', '#222'); pressesInput.style('color', '#fff'); pressesInput.style('border', '1px solid #555'); pressesInput.style('border-radius', '4px');
 
-    let passLabel = createP("PASSWORD FOR GAME MASTER:").parent(overlay);
+    let passLabel = createP("PASSWORD:").parent(overlay);
     passLabel.style('color', '#ffffff'); passLabel.style('font-size', '24px'); passLabel.style('margin', '15px 0 0 0');
     passLabel.style("font-size","24px");
 
