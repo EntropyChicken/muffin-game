@@ -132,13 +132,43 @@ function formatTimer(seconds) {
 // MUFFIN FORMATTER
 // ==========================================================
 
-function formatMuffins(amount) {
-
-	if (Math.abs(amount) < 1e-10) {
-		return "0";
+function encodeQuantityPayload(value) {
+	if (value instanceof Quantity) return value.toString();
+	if (Array.isArray(value)) return value.map(encodeQuantityPayload);
+	if (value && typeof value === "object") {
+		const out = {};
+		for (const [key, nestedValue] of Object.entries(value)) {
+			out[key] = encodeQuantityPayload(nestedValue);
+		}
+		return out;
 	}
+	return value;
+}
 
-	return parseFloat(amount.toFixed(12)).toString();
+function decodeQuantityPayload(value) {
+	if (typeof value === "string") {
+		return Quantity.sanitizeInput(value) ? Quantity.fromString(value) : value;
+	}
+	if (Array.isArray(value)) return value.map(decodeQuantityPayload);
+	if (value && typeof value === "object") {
+		const out = {};
+		for (const [key, nestedValue] of Object.entries(value)) {
+			out[key] = decodeQuantityPayload(nestedValue);
+		}
+		return out;
+	}
+	return value;
+}
+
+function asQuantity(value) {
+	if (value instanceof Quantity) return value;
+	return Quantity.fromJSON(value);
+}
+
+function formatMuffins(amount) {
+	const quantity = asQuantity(amount);
+	if (quantity.isZero()) return "0";
+	return quantity.toDisplayString();
 }
 
 

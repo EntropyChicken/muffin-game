@@ -314,7 +314,7 @@ function connectToSupabase() {
 
   channel.on("broadcast", { event: EVENTS.SETTINGS_SYNC }, (msg) => {
     if (msg.payload) {
-      maxMuffins = msg.payload.maxMuffins;
+      maxMuffins = asQuantity(msg.payload.maxMuffins);
       maxPresses = msg.payload.maxPresses;
       runDurationSeconds = msg.payload.runDurationSeconds;
       if (pressesText) pressesText.html(pressesLabel());
@@ -327,7 +327,8 @@ function connectToSupabase() {
   });
   channel.on("broadcast", { event: EVENTS.DEDICATIONS_SYNC }, (msg) => {
     if (msg.payload && msg.payload.dedicationMax) {
-      renderDedicationsLists(msg.payload.dedicationMax);
+      const decodedDedicationMax = decodeQuantityPayload(msg.payload.dedicationMax);
+      renderDedicationsLists(decodedDedicationMax);
     }
   });
   channel.subscribe((status) => {
@@ -408,21 +409,21 @@ function handleDedicate() {
     return;
   }
 
-  const amount = parseFloat(rawAmount);
-  if (isNaN(amount)) {
+  const amount = Quantity.fromString(rawAmount);
+  if (amount.isZero() && rawAmount.trim() !== "0" && rawAmount.trim() !== "0.0") {
     statusText.html("ERROR: Amount must be a valid number.");
     return;
   }
 
-  if (amount < 0 || amount > maxMuffins) {
-    statusText.html(`ERROR: Dedication must be between 0 and ${maxMuffins} muffins.`);
+  if (amount.isLessThan(Quantity.zero()) || amount.isGreaterThan(maxMuffins)) {
+    statusText.html(`ERROR: Dedication must be between 0 and ${formatMuffins(maxMuffins)} muffins.`);
     return;
   }
 
   channel.send({
     type: "broadcast",
     event: EVENTS.DEDICATE,
-    payload: { player: playerName, amount: amount, recipient: name }
+    payload: { player: playerName, amount: amount.toString(), recipient: name }
   });
 
   statusText.html(`Sent dedication of ${formatMuffins(amount)} muffins to ${name}.`);
@@ -564,10 +565,9 @@ function renderDedicationsLists(dedicationMax) {
 
   for (const p of players) {
 
-    const amt =
-      dedicationMax[p]?.[playerName] ?? 0;
+    const amt = asQuantity(dedicationMax[p]?.[playerName] ?? Quantity.zero());
 
-    if (amt > 0) {
+    if (amt.isGreaterThan(Quantity.zero())) {
       fromHtml += `
       <div style="
       display:flex;
@@ -584,9 +584,9 @@ function renderDedicationsLists(dedicationMax) {
 
   for (const p of players) {
 
-    const amt = mine[p] || 0;
+    const amt = asQuantity(mine[p] || Quantity.zero());
 
-    if (amt > 0) {
+    if (amt.isGreaterThan(Quantity.zero())) {
       toHtml += `
       <div style="
       display:flex;

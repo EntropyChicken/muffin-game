@@ -30,8 +30,8 @@ let currentRunner;    // playerName | null
 let timerEndTime;     // ms epoch timestamp | null
 let winner;           // playerName | null
 
-let dedicationMax;    // dedicationMax[from][to] = highest amount so far
-let dedicationLog;    // [{ time, from, to, amount }], oldest first
+let dedicationMax;    // dedicationMax[from][to] = highest muffin amount as Quantity
+let dedicationLog;    // [{ time, from, to, amount }] with Quantity amounts
 
 let channel;
 let channelStatusText = "connecting...";
@@ -275,14 +275,15 @@ async function checkGMPasswordHashed() {
       const entered = passInput.value().trim();
       
       if (await sha256HashHex(entered) === gameMasterPasswordHash) {
-        maxMuffins = parseFloat(muffinInput.value()) || 6;
+        const rawMaxMuffins = muffinInput.value().trim();
+        maxMuffins = Quantity.fromString(rawMaxMuffins || "6");
         runDurationSeconds = parseFloat(timerInput.value()) || 60;
         maxPresses = parseInt(pressesInput.value()) || 5;
         
         channel.send({
           type: "broadcast",
           event: EVENTS.SETTINGS_SYNC,
-          payload: { maxMuffins, runDurationSeconds, maxPresses }
+          payload: { maxMuffins: encodeQuantityPayload(maxMuffins), runDurationSeconds, maxPresses }
         });
         
         resetGameState();
@@ -320,12 +321,12 @@ function resetGameState() {
   for (const p of players) {
     const key = p.toLowerCase();
     if (!(key in playerWealth)) {
-      playerWealth[key] = 0;
+      playerWealth[key] = Quantity.zero();
     }
     pressesRemaining[p] = maxPresses;
     dedicationMax[p] = {};
     for (const q of players) {
-      dedicationMax[p][q] = 0;
+      dedicationMax[p][q] = Quantity.zero();
     }
   }
 }
@@ -461,12 +462,12 @@ function connectToSupabase() {
     channel.send({
       type: "broadcast",
       event: EVENTS.SETTINGS_SYNC,
-      payload: { maxPresses, maxMuffins, runDurationSeconds }
+      payload: { maxPresses, maxMuffins: encodeQuantityPayload(maxMuffins), runDurationSeconds }
     });
     channel.send({
       type: "broadcast",
       event: EVENTS.DEDICATIONS_SYNC,
-      payload: { dedicationMax }
+      payload: { dedicationMax: encodeQuantityPayload(dedicationMax) }
     });
   });
 
@@ -534,7 +535,7 @@ function removePlayerFromGame(playerName) {
     channel.send({
       type: "broadcast",
       event: EVENTS.DEDICATIONS_SYNC,
-      payload: { dedicationMax }
+      payload: { dedicationMax: encodeQuantityPayload(dedicationMax) }
     });
 
     channel.send({
@@ -570,14 +571,14 @@ function registerNewPlayer() {
 
   players.push(newName);
   if (!(newName.toLowerCase() in playerWealth)) {
-    playerWealth[newName.toLowerCase()] = 0;
+    playerWealth[newName.toLowerCase()] = Quantity.zero();
   }
   pressesRemaining[newName] = maxPresses;
   dedicationMax[newName] = {};
 
   for (const existingPlayer of players) {
-    dedicationMax[existingPlayer][newName] = 0;
-    dedicationMax[newName][existingPlayer] = 0;
+    dedicationMax[existingPlayer][newName] = Quantity.zero();
+    dedicationMax[newName][existingPlayer] = Quantity.zero();
   }
 
   console.log(`Successfully added new player: ${newName}`);
@@ -602,7 +603,7 @@ function registerNewPlayer() {
     channel.send({
       type: "broadcast",
       event: EVENTS.DEDICATIONS_SYNC,
-      payload: { dedicationMax }
+      payload: { dedicationMax: encodeQuantityPayload(dedicationMax) }
     });
   }
   
@@ -652,7 +653,8 @@ function handlePressMessage(payload) {
 
 function handleDedicateMessage(payload) {
   const player = payload && payload.player;
-  const amount = payload && payload.amount;
+  const amountRaw = payload && payload.amount;
+  const amount = asQuantity(amountRaw);
   const recipientRaw = payload && payload.recipient;
 
   if (gameStatus === "finished") {
@@ -663,7 +665,7 @@ function handleDedicateMessage(payload) {
     console.log(`Received a dedication from unrecognized player "${player}".`);
     return;
   }
-  if (!recipientRaw || isNaN(amount)) {
+  if (!recipientRaw || !amountRaw || !Quantity.sanitizeInput(amountRaw)) {
     console.log(`Received bad dedication data from ${player}.`);
     return;
   }
@@ -675,26 +677,26 @@ function handleDedicateMessage(payload) {
     return;
   }
 
-  let currentTotalToOthers = 0;
+  let currentTotalToOthers = Quantity.zero();
   for (const target of players) {
     if (target !== recipient) {
-      currentTotalToOthers += (dedicationMax[player][target] || 0);
+      currentTotalToOthers = currentTotalToOthers.add(dedicationMax[player][target] || Quantity.zero());
     }
   }
 
-  if (amount + currentTotalToOthers > maxMuffins) {
+  if (amount.add(currentTotalToOthers).isGreaterThan(maxMuffins)) {
     channel.send({
        type: "broadcast",
        event: EVENTS.DEDICATE_ERROR,
-       payload: { player: player, message: `ERROR: Giving ${amount} more would exceed your limit of ${maxMuffins} total muffins.` }
+       payload: { player: player, message: `ERROR: Giving ${amount.toDisplayString()} more would exceed your limit of ${maxMuffins.toDisplayString()} total muffins.` }
     });
-    console.log(`${player} hit their ${maxMuffins}-muffin max cap and was rejected.`);
+    console.log(`${player} hit their ${maxMuffins.toDisplayString()}-muffin max cap and was rejected.`);
     return;
   }
 
   const previousMax = dedicationMax[player][recipient];
-  if (amount <= previousMax) {
-    console.log(`${player} tried to dedicate ${amount} to ${recipient}, which doesn't exceed previous max of ${previousMax}.`);
+  if (amount.isLessThanOrEqualTo(previousMax)) {
+    console.log(`${player} tried to dedicate ${amount.toDisplayString()} to ${recipient}, which doesn't exceed previous max of ${previousMax.toDisplayString()}.`);
     return;
   }
 
@@ -710,7 +712,7 @@ function handleDedicateMessage(payload) {
   channel.send({
     type: "broadcast",
     event: EVENTS.DEDICATIONS_SYNC,
-    payload: { dedicationMax }
+    payload: { dedicationMax: encodeQuantityPayload(dedicationMax) }
   });
 }
 
@@ -904,31 +906,30 @@ function applyRoundPayout() {
 
 	if (winner) {
 
-		let totalDedicated = 0;
+		let totalDedicated = Quantity.zero();
 
 		for (const p of players) {
 
 			if (p === winner) continue;
 
-			const amt = dedicationMax[winner][p] || 0;
+			const amt = dedicationMax[winner][p] || Quantity.zero();
 
-			totalDedicated += amt;
+			totalDedicated = totalDedicated.add(amt);
 
-			playerWealth[p.toLowerCase()] += amt;
+			playerWealth[p.toLowerCase()] = (playerWealth[p.toLowerCase()] || Quantity.zero()).add(amt);
 		}
 
-		playerWealth[winner.toLowerCase()] +=
-			maxMuffins - totalDedicated;
+		playerWealth[winner.toLowerCase()] = (playerWealth[winner.toLowerCase()] || Quantity.zero()).add(maxMuffins.subtract(totalDedicated));
 	}
 	else {
 
-		let total = 6;
+		let total = Quantity.fromNumber(6);
 
 		for (const p of players) {
-			total += playerWealth[p.toLowerCase()];
+			total = total.add(playerWealth[p.toLowerCase()] || Quantity.zero());
 		}
 
-		const each = (players.length === 0 ? 0 : total / players.length);
+		const each = (players.length === 0 ? Quantity.zero() : total.divideByInt(players.length));
 
 		for (const p of players) {
 			playerWealth[p.toLowerCase()] = each;
@@ -1072,7 +1073,7 @@ function countPayoutLines() {
   if (!winner) return 0;
   for (const p of players) {
     if (p === winner) continue;
-    if ((dedicationMax[winner] && dedicationMax[winner][p]) > 0) n++;
+    if (dedicationMax[winner] && dedicationMax[winner][p] && dedicationMax[winner][p].isGreaterThan(Quantity.zero())) n++;
   }
   return n + 1;
 }
@@ -1096,17 +1097,17 @@ function drawPayout() {
   textBox("PAYOUT:", x, y);
   y += 35;
 
-  let totalDedicated = 0;
+  let totalDedicated = Quantity.zero();
   for (const p of players) {
     if (p === winner) continue;
-    const amt = dedicationMax[winner][p] || 0;
-    if (amt > 0) {
+    const amt = dedicationMax[winner][p] || Quantity.zero();
+    if (amt.isGreaterThan(Quantity.zero())) {
       textBox(`${p} gets ${formatMuffins(amt)} muffins`, x, y);
       y += 35;
-      totalDedicated += amt;
+      totalDedicated = totalDedicated.add(amt);
     }
   }
-  const winnerKeeps = maxMuffins - totalDedicated;
+  const winnerKeeps = maxMuffins.subtract(totalDedicated);
   textBox(`${winner} gets ${formatMuffins(winnerKeeps)} muffins and is the WINNER`, x, y);
 }
 
@@ -1254,7 +1255,13 @@ function startNextRound() {
   textSize(40);
   textBox("LEADERBOARD", width / 2, 30);
 
-  const standings = Object.entries(playerWealth).sort((a, b) => b[1] - a[1]);
+  const standings = Object.entries(playerWealth).sort((a, b) => {
+    const left = asQuantity(a[1]);
+    const right = asQuantity(b[1]);
+    if (left.isGreaterThan(right)) return -1;
+    if (left.isLessThan(right)) return 1;
+    return 0;
+  });
   
   // Set the text size BEFORE measuring textWidth, otherwise the measurements will be wrong!
   textAlign(LEFT, TOP);
@@ -1271,7 +1278,8 @@ function startNextRound() {
   for (let i = 0; i < standings.length; i++) {
     const [name, wealth] = standings[i];
     
-    if (i > 0 && wealth < lastWealth) {
+    const wealthValue = asQuantity(wealth);
+    if (i > 0 && lastWealth !== null && wealthValue.isLessThan(lastWealth)) {
       displayRank = i + 1;
     }
     
@@ -1284,7 +1292,7 @@ function startNextRound() {
     
     // Store processed data for the drawing pass
     leaderboardRows.push({ rankStr, name, wealthStr });
-    lastWealth = wealth;
+    lastWealth = wealthValue;
   }
 
   // --- PASS 2: Calculate dynamic column X positions and draw ---
