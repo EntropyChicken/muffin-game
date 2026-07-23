@@ -1,6 +1,7 @@
 # Muffin Game
 
-An original game I came up with in order to write a story about game theory concepts falling apart under real-world behavior.
+I originally came up with the Muffin Game to write a fiction piece about game theory concepts falling apart under real-world behavior.
+This repo contains a web app to host and play the Muffin Game online.
 
 <img src="assets/muffinGamesLogo1.2.png" width="300" alt="Muffin Game Logo" />
 
